@@ -807,18 +807,17 @@ export const MeetingModal = ({
           <div className="grid grid-cols-4 gap-2">
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Timezone</Label>
-              <TooltipProvider>
+              <TooltipProvider delayDuration={500}>
                 <Popover open={tzPopoverOpen} onOpenChange={setTzPopoverOpen}>
-                  <Tooltip>
+                  <Tooltip delayDuration={500}>
                     <TooltipTrigger asChild>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="w-full h-8 justify-start text-left font-normal text-xs gap-1.5">
-                          
                           <span className="truncate">{selectedTimezone?.short || timezone}</span>
                         </Button>
                       </PopoverTrigger>
                     </TooltipTrigger>
-                    <TooltipContent>
+                    <TooltipContent side="bottom" sideOffset={5}>
                       <p>{selectedTimezone?.label || timezone}</p>
                     </TooltipContent>
                   </Tooltip>

@@ -655,17 +655,27 @@ const DayWeekView = ({
                           </div>
                         )}
                       </div>
-                      {meeting.join_url && (
-                        <a
-                          href={meeting.join_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex-shrink-0 px-2 py-0.5 text-[10px] font-semibold bg-white/90 hover:bg-white text-primary rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          Join
-                        </a>
-                      )}
+                      {meeting.join_url && (() => {
+                        const now = new Date();
+                        const startTime = new Date(meeting.start_time);
+                        const endTime = new Date(meeting.end_time);
+                        const minutesUntilStart = (startTime.getTime() - now.getTime()) / (1000 * 60);
+                        const isImminent = minutesUntilStart <= 5 && minutesUntilStart >= -((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+                        return (
+                          <a
+                            href={meeting.join_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className={cn(
+                              "flex-shrink-0 px-2 py-0.5 text-[10px] font-semibold bg-white/90 hover:bg-white text-primary rounded shadow-sm transition-opacity",
+                              isImminent ? "opacity-100 animate-pulse" : "opacity-0 group-hover:opacity-100"
+                            )}
+                          >
+                            Join
+                          </a>
+                        );
+                      })()}
                     </div>
                   </div>
                 );

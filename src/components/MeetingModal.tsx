@@ -804,6 +804,17 @@ export const MeetingModal = ({
             </div>
           </div>
 
+          {/* Meeting Subject/Title */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Subject *</Label>
+            <Input
+              placeholder="Enter meeting subject"
+              value={formData.subject}
+              onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
+              className="h-8 text-xs"
+            />
+          </div>
+
           {/* Timezone, Date, Time & Duration Row */}
           <div className="grid grid-cols-4 gap-2">
             <div className="space-y-1.5">

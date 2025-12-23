@@ -282,7 +282,7 @@ export const KanbanBoard = ({
                 variant={selectionMode ? "default" : "outline"}
                 size="sm"
                 onClick={toggleSelectionMode}
-                className="hover-scale transition-all whitespace-nowrap text-sm h-8 px-3"
+                className="hover-scale transition-all whitespace-nowrap h-8 px-3 text-sm"
               >
                 {selectionMode ? "Exit Selection" : "Select Deals"}
               </Button>

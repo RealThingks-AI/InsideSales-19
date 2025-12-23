@@ -388,7 +388,15 @@ const Meetings = () => {
                         <TableCell>
                           <Checkbox checked={selectedMeetings.includes(meeting.id)} onCheckedChange={checked => handleSelectMeeting(meeting.id, !!checked)} aria-label={`Select ${meeting.subject}`} />
                         </TableCell>
-                        <TableCell className="font-medium">{meeting.subject}</TableCell>
+                        <TableCell 
+                          className="font-medium cursor-pointer hover:text-primary hover:underline"
+                          onClick={() => {
+                            setEditingMeeting(meeting);
+                            setShowModal(true);
+                          }}
+                        >
+                          {meeting.subject}
+                        </TableCell>
                         <TableCell className="text-sm">
                           {format(new Date(meeting.start_time), 'dd/MM/yyyy')}
                         </TableCell>

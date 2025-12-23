@@ -1023,6 +1023,20 @@ export const MeetingModal = ({
                 </Button>}
             </div>
             <div className="flex gap-2">
+              {formData.join_url && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 h-8 text-xs"
+                  asChild
+                >
+                  <a href={formData.join_url} target="_blank" rel="noopener noreferrer">
+                    <Video className="h-3 w-3" />
+                    Join
+                  </a>
+                </Button>
+              )}
               <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => onOpenChange(false)}>
                 Close
               </Button>

@@ -327,7 +327,7 @@ export const KanbanBoard = ({
           }}
         >
           {/* Stage headers - now inside the scrollable container */}
-          <div className="sticky top-0 bg-background border-b border-border/30 z-10 pt-2 pb-2">
+          <div className="sticky top-0 bg-background border-b border-transparent z-10 pt-2 pb-2">
             <div 
               className="grid gap-2"
               style={{ 

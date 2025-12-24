@@ -1,7 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { X, GripVertical } from "lucide-react";
-import ReactGridLayout, { type Layout } from "react-grid-layout";
+import {
+  GridLayout,
+  type Layout,
+  type LayoutItem,
+  verticalCompactor,
+} from "react-grid-layout";
 
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -24,7 +29,7 @@ interface ResizableDashboardProps {
 }
 
 const COLS = 12;
-const ROW_HEIGHT = 28;
+const ROW_HEIGHT = 80;
 
 export const ResizableDashboard = ({
   isResizeMode,
@@ -35,18 +40,18 @@ export const ResizableDashboard = ({
   renderWidget,
   containerWidth,
 }: ResizableDashboardProps) => {
-  const layout: Layout[] = useMemo(() => {
+  const layout: Layout = useMemo(() => {
     const defaults = new Map<WidgetKey, WidgetLayout>();
     DEFAULT_WIDGETS.forEach((w) => defaults.set(w.key, w.defaultLayout));
 
-    return visibleWidgets.map((key) => {
+    return visibleWidgets.map((key, index): LayoutItem => {
       const saved = widgetLayouts[key];
       const d = defaults.get(key) ?? { x: 0, y: 0, w: 3, h: 2 };
 
       return {
         i: key,
-        x: Math.max(0, Math.min(COLS - 1, saved?.x ?? d.x ?? 0)),
-        y: Math.max(0, saved?.y ?? d.y ?? 0),
+        x: saved?.x ?? (index % 6) * 2,
+        y: saved?.y ?? Math.floor(index / 6) * 2,
         w: Math.max(2, Math.min(COLS, saved?.w ?? d.w ?? 3)),
         h: Math.max(2, saved?.h ?? d.h ?? 2),
         minW: 2,
@@ -55,36 +60,48 @@ export const ResizableDashboard = ({
     });
   }, [visibleWidgets, widgetLayouts]);
 
-  const handleLayoutChange = (newLayout: Layout[]) => {
-    const next: WidgetLayoutConfig = { ...widgetLayouts };
+  const handleLayoutChange = useCallback(
+    (newLayout: Layout) => {
+      const next: WidgetLayoutConfig = {};
 
-    newLayout.forEach((l) => {
-      const key = l.i as WidgetKey;
-      next[key] = { x: l.x, y: l.y, w: l.w, h: l.h };
-    });
+      newLayout.forEach((l) => {
+        const key = l.i as WidgetKey;
+        if (visibleWidgets.includes(key)) {
+          next[key] = { x: l.x, y: l.y, w: l.w, h: l.h };
+        }
+      });
 
-    onLayoutChange(next);
-  };
+      onLayoutChange(next);
+    },
+    [visibleWidgets, onLayoutChange]
+  );
 
   return (
     <div className="dashboard-grid">
-      <ReactGridLayout
+      <GridLayout
         className="layout"
         layout={layout}
-        cols={COLS}
-        rowHeight={ROW_HEIGHT}
         width={Math.max(320, containerWidth)}
-        margin={[16, 16]}
-        containerPadding={[0, 0]}
-        isDraggable={isResizeMode}
-        isResizable={isResizeMode}
-        draggableHandle=".dash-drag-handle"
-        resizeHandles={["se", "s", "e", "n", "w", "ne", "nw", "sw"]}
-        compactType="vertical"
-        preventCollision
-        allowOverlap={false}
+        gridConfig={{
+          cols: COLS,
+          rowHeight: ROW_HEIGHT,
+          margin: [16, 16] as const,
+          containerPadding: [0, 0] as const,
+          maxRows: Infinity,
+        }}
+        dragConfig={{
+          enabled: isResizeMode,
+          handle: ".dash-drag-handle",
+          threshold: 3,
+          bounded: false,
+        }}
+        resizeConfig={{
+          enabled: isResizeMode,
+          handles: ["se", "s", "e"],
+        }}
+        compactor={verticalCompactor}
         onLayoutChange={handleLayoutChange}
-        useCSSTransforms
+        autoSize
       >
         {visibleWidgets.map((key) => (
           <div
@@ -117,12 +134,16 @@ export const ResizableDashboard = ({
               </div>
             )}
 
-            <div className={isResizeMode ? "dash-content dash-content--locked" : "dash-content"}>
+            <div
+              className={
+                isResizeMode ? "dash-content dash-content--locked" : "dash-content"
+              }
+            >
               {renderWidget(key)}
             </div>
           </div>
         ))}
-      </ReactGridLayout>
+      </GridLayout>
 
       <style>{`
         .dashboard-grid .react-grid-layout {
@@ -132,10 +153,13 @@ export const ResizableDashboard = ({
         .dash-item {
           height: 100%;
           position: relative;
+          overflow: hidden;
+          border-radius: 0.5rem;
         }
 
         .dash-content {
           height: 100%;
+          overflow: auto;
         }
 
         .dash-content--locked {
@@ -146,6 +170,7 @@ export const ResizableDashboard = ({
         .dash-item--edit {
           animation: dash-wiggle 0.28s ease-in-out infinite;
           transform-origin: center;
+          box-shadow: 0 0 0 2px hsl(var(--primary) / 0.3);
         }
 
         @keyframes dash-wiggle {
@@ -170,22 +195,25 @@ export const ResizableDashboard = ({
           left: 8px;
           z-index: 20;
           cursor: grab;
-          border-radius: 10px;
-          padding: 6px;
+          border-radius: 6px;
+          padding: 4px;
           border: 1px solid hsl(var(--border));
-          background: hsl(var(--background) / 0.9);
+          background: hsl(var(--background) / 0.95);
           backdrop-filter: blur(8px);
-          box-shadow: 0 6px 16px hsl(var(--foreground) / 0.08);
+          box-shadow: 0 2px 8px hsl(var(--foreground) / 0.08);
         }
         .dash-drag-handle:active {
           cursor: grabbing;
         }
 
-        /* Make resize handles more visible while matching theme */
+        /* Resize handles */
         .dashboard-grid .react-resizable-handle {
           background-image: none;
-          opacity: ${isResizeMode ? 1 : 0};
+          opacity: 0;
           transition: opacity 0.15s ease;
+        }
+        .dash-item--edit .react-resizable-handle {
+          opacity: 1;
         }
         .dashboard-grid .react-resizable-handle::after {
           content: "";
@@ -194,14 +222,19 @@ export const ResizableDashboard = ({
           height: 10px;
           border-right: 2px solid hsl(var(--primary));
           border-bottom: 2px solid hsl(var(--primary));
-          right: 6px;
-          bottom: 6px;
+          right: 4px;
+          bottom: 4px;
           border-radius: 2px;
         }
 
         .dashboard-grid .react-grid-item.react-grid-placeholder {
-          background: hsl(var(--primary) / 0.12);
-          border: 1px dashed hsl(var(--primary) / 0.35);
+          background: hsl(var(--primary) / 0.15);
+          border: 2px dashed hsl(var(--primary) / 0.4);
+          border-radius: 0.5rem;
+        }
+
+        .dashboard-grid .react-grid-item > .react-resizable-handle {
+          z-index: 15;
         }
       `}</style>
     </div>

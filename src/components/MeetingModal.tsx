@@ -503,82 +503,88 @@ export const MeetingModal = ({
     return utcTime.toISOString();
   }, [startDate, startTime, endTime, timezone]);
   useEffect(() => {
-    if (open) {
-      fetchLeadsAndContacts();
-      if (meeting) {
-        const start = new Date(meeting.start_time);
-        const end = new Date(meeting.end_time);
-        const durationMs = end.getTime() - start.getTime();
-        const durationMinutes = Math.round(durationMs / (1000 * 60));
+    const initializeModal = async () => {
+      if (open) {
+        // Fetch leads and contacts first before setting form data
+        await fetchLeadsAndContacts();
+        
+        if (meeting) {
+          const start = new Date(meeting.start_time);
+          const end = new Date(meeting.end_time);
+          const durationMs = end.getTime() - start.getTime();
+          const durationMinutes = Math.round(durationMs / (1000 * 60));
 
-        setStartDate(start);
-        setStartTime(format(start, "HH:mm"));
-        setEndTime(format(end, "HH:mm"));
-        setDuration(durationMinutes.toString());
-        setDurationMode('duration');
-        setFormData({
-          subject: meeting.subject || "",
-          description: meeting.description || "",
-          join_url: meeting.join_url || "",
-          lead_id: meeting.lead_id || "",
-          contact_id: meeting.contact_id || "",
-          status: meeting.status || "scheduled",
-          outcome: meeting.outcome || ""
-        });
-        if (meeting.lead_id) {
+          setStartDate(start);
+          setStartTime(format(start, "HH:mm"));
+          setEndTime(format(end, "HH:mm"));
+          setDuration(durationMinutes.toString());
+          setDurationMode('duration');
+          setFormData({
+            subject: meeting.subject || "",
+            description: meeting.description || "",
+            join_url: meeting.join_url || "",
+            lead_id: meeting.lead_id || "",
+            contact_id: meeting.contact_id || "",
+            status: meeting.status || "scheduled",
+            outcome: meeting.outcome || ""
+          });
+          if (meeting.lead_id) {
+            setLinkType('lead');
+          } else if (meeting.contact_id) {
+            setLinkType('contact');
+          }
+          if (meeting.attendees && Array.isArray(meeting.attendees)) {
+            const existingEmails = (meeting.attendees as {
+              email: string;
+            }[]).map(a => a.email).filter(Boolean);
+            setParticipants(existingEmails);
+            if (existingEmails.length > 0) setShowParticipantsInput(true);
+          } else {
+            setParticipants([]);
+          }
+        } else {
+          // Default: next available 30-min slot in user's timezone
+          const browserTz = getBrowserTimezone();
+          const nowInTz = toZonedTime(new Date(), browserTz);
+          const currentHour = nowInTz.getHours();
+          const currentMinutes = nowInTz.getMinutes();
+          
+          // Calculate next 30-minute slot (either :00 or :30)
+          const defaultStart = new Date(nowInTz);
+          defaultStart.setSeconds(0, 0);
+          
+          if (currentMinutes < 30) {
+            // Next slot is :30 of current hour
+            defaultStart.setMinutes(30);
+          } else {
+            // Next slot is :00 of next hour
+            defaultStart.setHours(currentHour + 1, 0);
+          }
+          
+          setStartDate(defaultStart);
+          setStartTime(format(defaultStart, "HH:mm"));
+          setDuration("30");
+          setEndTime(updateEndTimeFromDuration(format(defaultStart, "HH:mm"), 30));
+          setDurationMode('duration');
+          setTimezone(getBrowserTimezone());
           setLinkType('lead');
-        } else if (meeting.contact_id) {
-          setLinkType('contact');
-        }
-        if (meeting.attendees && Array.isArray(meeting.attendees)) {
-          const existingEmails = (meeting.attendees as {
-            email: string;
-          }[]).map(a => a.email).filter(Boolean);
-          setParticipants(existingEmails);
-          if (existingEmails.length > 0) setShowParticipantsInput(true);
-        } else {
           setParticipants([]);
+          setEmailInput("");
+          setShowParticipantsInput(false);
+          setFormData({
+            subject: "",
+            description: "",
+            join_url: "",
+            lead_id: "",
+            contact_id: "",
+            status: "scheduled",
+            outcome: ""
+          });
         }
-      } else {
-        // Default: next available 30-min slot in user's timezone
-        const browserTz = getBrowserTimezone();
-        const nowInTz = toZonedTime(new Date(), browserTz);
-        const currentHour = nowInTz.getHours();
-        const currentMinutes = nowInTz.getMinutes();
-        
-        // Calculate next 30-minute slot (either :00 or :30)
-        const defaultStart = new Date(nowInTz);
-        defaultStart.setSeconds(0, 0);
-        
-        if (currentMinutes < 30) {
-          // Next slot is :30 of current hour
-          defaultStart.setMinutes(30);
-        } else {
-          // Next slot is :00 of next hour
-          defaultStart.setHours(currentHour + 1, 0);
-        }
-        
-        setStartDate(defaultStart);
-        setStartTime(format(defaultStart, "HH:mm"));
-        setDuration("30");
-        setEndTime(updateEndTimeFromDuration(format(defaultStart, "HH:mm"), 30));
-        setDurationMode('duration');
-        setTimezone(getBrowserTimezone());
-        setLinkType('lead');
-        setParticipants([]);
-        setEmailInput("");
-        setShowParticipantsInput(false);
-        setFormData({
-          subject: "",
-          description: "",
-          join_url: "",
-          lead_id: "",
-          contact_id: "",
-          status: "scheduled",
-          outcome: ""
-        });
       }
-    }
+    };
+    
+    initializeModal();
   }, [open, meeting]);
   const fetchLeadsAndContacts = async () => {
     try {

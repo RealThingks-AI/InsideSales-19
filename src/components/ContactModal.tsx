@@ -16,14 +16,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { X, ChevronDown } from "lucide-react";
 
 const contactSchema = z.object({
-  contact_name: z.string().min(1, "Contact name is required"),
+  contact_name: z.string()
+    .min(1, "Contact name is required")
+    .min(2, "Contact name must be at least 2 characters")
+    .max(100, "Contact name must be less than 100 characters"),
   account_id: z.string().optional(),
-  position: z.string().optional(),
-  email: z.string().email("Invalid email address").optional().or(z.literal("")),
-  phone_no: z.string().optional(),
-  linkedin: z.string().url("Invalid LinkedIn URL").optional().or(z.literal("")),
+  position: z.string().max(100, "Position must be less than 100 characters").optional(),
+  email: z.string().email("Please enter a valid email address (e.g., name@company.com)").optional().or(z.literal("")),
+  phone_no: z.string().max(20, "Phone number must be less than 20 characters").optional(),
+  linkedin: z.string().url("Please enter a valid LinkedIn URL (e.g., https://linkedin.com/in/username)").optional().or(z.literal("")),
   contact_source: z.string().optional(),
-  description: z.string().optional(),
+  description: z.string().max(1000, "Description must be less than 1000 characters").optional(),
 });
 
 type ContactFormData = z.infer<typeof contactSchema>;
@@ -458,7 +461,12 @@ export const ContactModal = ({ open, onOpenChange, contact, onSuccess }: Contact
                 Cancel
               </Button>
               <Button type="submit" disabled={loading}>
-                {loading ? "Saving..." : contact ? "Save Changes" : "Add Contact"}
+                {loading ? (
+                  <>
+                    <span className="animate-spin mr-2">⏳</span>
+                    {contact ? "Saving..." : "Creating..."}
+                  </>
+                ) : contact ? "Save Changes" : "Add Contact"}
               </Button>
             </div>
           </form>

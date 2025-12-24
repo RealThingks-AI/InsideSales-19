@@ -224,16 +224,31 @@ const TIMEZONES = [{
   short: "GMT+13"
 }];
 
-// Duration options
+// Duration options (in minutes)
 const DURATION_OPTIONS = [{
+  value: "15",
+  label: "15 min"
+}, {
   value: "30",
   label: "30 min"
+}, {
+  value: "45",
+  label: "45 min"
 }, {
   value: "60",
   label: "1 hour"
 }, {
+  value: "90",
+  label: "1.5 hours"
+}, {
   value: "120",
   label: "2 hours"
+}, {
+  value: "180",
+  label: "3 hours"
+}, {
+  value: "240",
+  label: "4 hours"
 }];
 
 // Generate 15-minute time slots
@@ -319,9 +334,59 @@ export const MeetingModal = ({
   const tzListRef = useRef<HTMLDivElement | null>(null);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [timePopoverOpen, setTimePopoverOpen] = useState(false);
+  const [endTimePopoverOpen, setEndTimePopoverOpen] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("10:00");
   const [duration, setDuration] = useState("60");
+  const [durationMode, setDurationMode] = useState<'duration' | 'endTime'>('duration');
+
+  // Auto-calculate duration when end time changes
+  const calculateDurationFromTimes = (start: string, end: string): number => {
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    let startMinutes = startH * 60 + startM;
+    let endMinutes = endH * 60 + endM;
+    // Handle crossing midnight
+    if (endMinutes <= startMinutes) {
+      endMinutes += 24 * 60;
+    }
+    return endMinutes - startMinutes;
+  };
+
+  // Update end time when start time or duration changes
+  const updateEndTimeFromDuration = (start: string, dur: number) => {
+    const [h, m] = start.split(':').map(Number);
+    const totalMinutes = h * 60 + m + dur;
+    const endH = Math.floor(totalMinutes / 60) % 24;
+    const endM = totalMinutes % 60;
+    return `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
+  };
+
+  // When end time is manually changed, auto-calculate duration
+  const handleEndTimeChange = (newEndTime: string) => {
+    setEndTime(newEndTime);
+    setDurationMode('endTime');
+    const calculatedDuration = calculateDurationFromTimes(startTime, newEndTime);
+    if (calculatedDuration > 0) {
+      setDuration(calculatedDuration.toString());
+    }
+  };
+
+  // When duration is changed, update end time
+  const handleDurationChange = (newDuration: string) => {
+    setDuration(newDuration);
+    setDurationMode('duration');
+    const newEndTime = updateEndTimeFromDuration(startTime, parseInt(newDuration));
+    setEndTime(newEndTime);
+  };
+
+  // When start time changes, update end time based on current duration
+  const handleStartTimeChange = (newStartTime: string) => {
+    setStartTime(newStartTime);
+    const newEndTime = updateEndTimeFromDuration(newStartTime, parseInt(duration));
+    setEndTime(newEndTime);
+  };
   useEffect(() => {
     if (!tzPopoverOpen) return;
 
@@ -408,10 +473,17 @@ export const MeetingModal = ({
   }, [startDate, startTime, timezone]);
   const proposedEndTime = useMemo(() => {
     if (!startDate) return "";
-    const endDateTime = calculateEndDateTime(startDate, startTime, parseInt(duration));
-    const utcTime = fromZonedTime(endDateTime, timezone);
+    const [h, m] = endTime.split(":").map(Number);
+    const dt = new Date(startDate);
+    dt.setHours(h, m, 0, 0);
+    // Handle crossing midnight
+    const [startH, startM] = startTime.split(":").map(Number);
+    if (h < startH || (h === startH && m < startM)) {
+      dt.setDate(dt.getDate() + 1);
+    }
+    const utcTime = fromZonedTime(dt, timezone);
     return utcTime.toISOString();
-  }, [startDate, startTime, duration, timezone]);
+  }, [startDate, startTime, endTime, timezone]);
   useEffect(() => {
     if (open) {
       fetchLeadsAndContacts();
@@ -421,13 +493,11 @@ export const MeetingModal = ({
         const durationMs = end.getTime() - start.getTime();
         const durationMinutes = Math.round(durationMs / (1000 * 60));
 
-        // Find closest duration option
-        const closestDuration = DURATION_OPTIONS.reduce((prev, curr) => {
-          return Math.abs(parseInt(curr.value) - durationMinutes) < Math.abs(parseInt(prev.value) - durationMinutes) ? curr : prev;
-        });
         setStartDate(start);
         setStartTime(format(start, "HH:mm"));
-        setDuration(closestDuration.value);
+        setEndTime(format(end, "HH:mm"));
+        setDuration(durationMinutes.toString());
+        setDurationMode('duration');
         setFormData({
           subject: meeting.subject || "",
           description: meeting.description || "",
@@ -473,6 +543,8 @@ export const MeetingModal = ({
         setStartDate(defaultStart);
         setStartTime(format(defaultStart, "HH:mm"));
         setDuration("30");
+        setEndTime(updateEndTimeFromDuration(format(defaultStart, "HH:mm"), 30));
+        setDurationMode('duration');
         setTimezone(getBrowserTimezone());
         setLinkType('lead');
         setParticipants([]);
@@ -507,10 +579,17 @@ export const MeetingModal = ({
     const utcTime = fromZonedTime(dt, timezone);
     return utcTime.toISOString();
   };
-  const buildEndISODateTime = (date: Date | undefined, time: string, durationMinutes: number): string => {
+  const buildEndISODateTime = (date: Date | undefined, endTimeStr: string): string => {
     if (!date) return "";
-    const endDateTime = calculateEndDateTime(date, time, durationMinutes);
-    const utcTime = fromZonedTime(endDateTime, timezone);
+    const [h, m] = endTimeStr.split(":").map(Number);
+    const dt = new Date(date);
+    dt.setHours(h, m, 0, 0);
+    // Handle crossing midnight
+    const [startH, startM] = startTime.split(":").map(Number);
+    if (h < startH || (h === startH && m < startM)) {
+      dt.setDate(dt.getDate() + 1);
+    }
+    const utcTime = fromZonedTime(dt, timezone);
     return utcTime.toISOString();
   };
   const createTeamsMeeting = async () => {
@@ -561,7 +640,7 @@ export const MeetingModal = ({
           subject: formData.subject,
           attendees,
           startTime: buildISODateTime(startDate, startTime),
-          endTime: buildEndISODateTime(startDate, startTime, parseInt(duration)),
+          endTime: buildEndISODateTime(startDate, endTime),
           timezone,
           description: formData.description
         }
@@ -648,7 +727,7 @@ export const MeetingModal = ({
         subject: formData.subject,
         description: formData.description || null,
         start_time: buildISODateTime(startDate, startTime),
-        end_time: buildEndISODateTime(startDate, startTime, parseInt(duration)),
+        end_time: buildEndISODateTime(startDate, endTime),
         join_url: joinUrl,
         lead_id:
           linkType === "lead" && formData.lead_id && formData.lead_id.trim() !== ""
@@ -874,17 +953,16 @@ export const MeetingModal = ({
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Time *</Label>
+              <Label className="text-xs font-medium">Start *</Label>
               <Popover open={timePopoverOpen} onOpenChange={setTimePopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full h-8 justify-start text-left font-normal text-xs">
-                    
                     {formatDisplayTime(startTime)}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-28 p-1 z-50 max-h-48 overflow-y-auto" align="start">
                   {availableStartTimeSlots.length > 0 ? availableStartTimeSlots.map(slot => <Button key={slot} variant={startTime === slot ? "secondary" : "ghost"} className="w-full justify-start text-xs h-7" onClick={() => {
-                  setStartTime(slot);
+                  handleStartTimeChange(slot);
                   setTimePopoverOpen(false);
                 }}>
                         {formatDisplayTime(slot)}
@@ -894,18 +972,33 @@ export const MeetingModal = ({
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Duration *</Label>
-              <Select value={duration} onValueChange={setDuration}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Duration" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DURATION_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                      {opt.label}
-                    </SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Label className="text-xs font-medium">End *</Label>
+              <Popover open={endTimePopoverOpen} onOpenChange={setEndTimePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full h-8 justify-start text-left font-normal text-xs">
+                    {formatDisplayTime(endTime)}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-28 p-1 z-50 max-h-48 overflow-y-auto" align="start">
+                  {TIME_SLOTS.map(slot => <Button key={slot} variant={endTime === slot ? "secondary" : "ghost"} className="w-full justify-start text-xs h-7" onClick={() => {
+                  handleEndTimeChange(slot);
+                  setEndTimePopoverOpen(false);
+                }}>
+                        {formatDisplayTime(slot)}
+                      </Button>)}
+                </PopoverContent>
+              </Popover>
             </div>
+          </div>
+
+          {/* Auto-calculated Duration Display */}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-2 py-1.5 rounded">
+            <span className="font-medium">Duration:</span>
+            <span>{parseInt(duration) >= 60 
+              ? `${Math.floor(parseInt(duration) / 60)}h${parseInt(duration) % 60 > 0 ? ` ${parseInt(duration) % 60}m` : ''}`
+              : `${duration}m`
+            }</span>
+            {durationMode === 'endTime' && <span className="text-xs text-primary">(auto-calculated)</span>}
           </div>
 
           {/* Conflict Warning */}

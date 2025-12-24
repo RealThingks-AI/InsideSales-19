@@ -235,7 +235,7 @@ export const ContactTableBody = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {pageContacts.map(contact => <TableRow key={contact.id} className="hover:bg-muted/20">
+          {pageContacts.map(contact => <TableRow key={contact.id} className="hover:bg-muted/20" data-state={selectedContacts.includes(contact.id) ? "selected" : undefined}>
               <TableCell className="text-center px-4 py-3">
                 <div className="flex justify-center">
                   <Checkbox checked={selectedContacts.includes(contact.id)} onCheckedChange={checked => handleSelectContact(contact.id, checked as boolean)} />
@@ -304,12 +304,18 @@ export const ContactTableBody = ({
       <AccountViewModal open={accountViewOpen} onOpenChange={setAccountViewOpen} accountId={viewAccountId} />
 
       {/* Send Email Modal */}
-      <SendEmailModal open={emailModalOpen} onOpenChange={setEmailModalOpen} recipient={emailContact ? {
-      name: emailContact.contact_name,
-      email: emailContact.email,
-      company_name: emailContact.company_name,
-      position: emailContact.position
-    } : null} />
+      <SendEmailModal 
+        open={emailModalOpen} 
+        onOpenChange={setEmailModalOpen} 
+        recipient={emailContact ? {
+          name: emailContact.contact_name,
+          email: emailContact.email,
+          company_name: emailContact.company_name,
+          position: emailContact.position
+        } : null}
+        contactId={emailContact?.id}
+        onEmailSent={onRefresh}
+      />
 
       {/* Meeting Modal */}
       <MeetingModal open={meetingModalOpen} onOpenChange={setMeetingModalOpen} meeting={meetingContact ? {

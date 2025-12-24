@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Search, Video, Trash2, Edit, Calendar, ArrowUpDown, ArrowUp, ArrowDown, List, CalendarDays, CheckCircle2, AlertCircle, UserX, CalendarClock } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MeetingsCalendarView } from "@/components/meetings/MeetingsCalendarView";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MeetingModal } from "@/components/MeetingModal";
@@ -286,6 +287,34 @@ const Meetings = () => {
                   Calendar
                 </Button>
               </div>
+
+              {/* Actions Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1">
+                    Actions
+                    
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem>
+                    
+                    Columns
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    
+                    Import CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    
+                    Export CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled={selectedMeetings.length === 0} className="text-destructive focus:text-destructive">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Selected ({selectedMeetings.length})
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               
               <Button size="sm" onClick={() => {
               setEditingMeeting(null);
@@ -388,13 +417,10 @@ const Meetings = () => {
                         <TableCell>
                           <Checkbox checked={selectedMeetings.includes(meeting.id)} onCheckedChange={checked => handleSelectMeeting(meeting.id, !!checked)} aria-label={`Select ${meeting.subject}`} />
                         </TableCell>
-                        <TableCell 
-                          className="font-medium cursor-pointer hover:text-primary hover:underline"
-                          onClick={() => {
-                            setEditingMeeting(meeting);
-                            setShowModal(true);
-                          }}
-                        >
+                        <TableCell className="font-medium text-primary cursor-pointer hover:underline" onClick={() => {
+                  setEditingMeeting(meeting);
+                  setShowModal(true);
+                }}>
                           {meeting.subject}
                         </TableCell>
                         <TableCell className="text-sm">
@@ -411,10 +437,23 @@ const Meetings = () => {
                         <TableCell>{getStatusBadge(meeting)}</TableCell>
                         <TableCell>{getOutcomeBadge(meeting.outcome || null)}</TableCell>
                         <TableCell>
-                          {meeting.join_url ? <a href={meeting.join_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                          {meeting.join_url ? (
+                            <a 
+                              href={meeting.join_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-primary hover:underline flex items-center gap-1"
+                            >
                               <Video className="h-4 w-4" />
-                              Join
-                            </a> : <span className="text-muted-foreground">—</span>}
+                              {meeting.join_url.includes('teams') ? 'Join (Teams)' :
+                               meeting.join_url.includes('zoom') ? 'Join (Zoom)' :
+                               meeting.join_url.includes('meet.google') ? 'Join (Meet)' :
+                               meeting.join_url.includes('webex') ? 'Join (Webex)' :
+                               'Join Meeting'}
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">

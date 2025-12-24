@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { User, Key, Bell, Palette, Users, UserCog, Activity, GitBranch, FileUp, Plug, FileText, Monitor, Shield, ChevronDown, Settings as SettingsIcon } from "lucide-react";
+import { User, Key, Bell, Palette, Users, UserCog, Activity, GitBranch, FileUp, Plug, FileText, Monitor, Shield, ChevronDown, Settings as SettingsIcon, History, BarChart3 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import UserManagement from "@/components/UserManagement";
 import SecuritySettings from "@/components/settings/SecuritySettings";
@@ -8,6 +8,8 @@ import AuditLogsSettings from "@/components/settings/AuditLogsSettings";
 import PageAccessSettings from "@/components/settings/PageAccessSettings";
 import BackupRestoreSettings from "@/components/settings/BackupRestoreSettings";
 import EmailTemplatesSettings from "@/components/settings/EmailTemplatesSettings";
+import EmailHistorySettings from "@/components/settings/EmailHistorySettings";
+import { EmailAnalyticsDashboard } from "@/components/settings/EmailAnalyticsDashboard";
 import ProfileSettings from "@/components/settings/ProfileSettings";
 import NotificationSettings from "@/components/settings/NotificationSettings";
 import DisplaySettings from "@/components/settings/DisplaySettings";
@@ -82,6 +84,14 @@ const menuSections: MenuSection[] = [{
     icon: FileText,
     adminOnly: true
   }, {
+  id: "email-history",
+    label: "Email History",
+    icon: History
+  }, {
+    id: "email-analytics",
+    label: "Email Analytics",
+    icon: BarChart3
+  }, {
     id: "backup",
     label: "Data Import/Export",
     icon: FileUp,
@@ -140,6 +150,10 @@ const Settings = () => {
         return <PipelineSettings />;
       case "email-templates":
         return <EmailTemplatesSettings />;
+      case "email-history":
+        return <EmailHistorySettings />;
+      case "email-analytics":
+        return <EmailAnalyticsDashboard />;
       case "backup":
         return <BackupRestoreSettings />;
       case "integrations":
@@ -160,18 +174,7 @@ const Settings = () => {
     return "Settings";
   };
   return <div className="h-screen flex flex-col bg-background overflow-hidden">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0 bg-background">
-        <div className="px-6 h-16 flex items-center border-b w-full">
-          <div className="flex items-center justify-between w-full">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-2xl text-foreground font-semibold">Settings</h1>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Navigation Tabs */}
+      {/* Fixed Header with Navigation Tabs */}
       <div className="flex-shrink-0 bg-background">
         <div className="px-6 py-4">
           <div className="flex flex-wrap gap-2">
@@ -204,6 +207,7 @@ const Settings = () => {
           })}
           </div>
         </div>
+        <div className="border-b w-full hidden" />
       </div>
 
       {/* Content Area */}

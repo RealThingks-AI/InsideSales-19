@@ -12,7 +12,8 @@ import { InlineEditCell } from "./InlineEditCell";
 import { DealColumnCustomizer, DealColumnConfig } from "./DealColumnCustomizer";
 import { BulkActionsBar } from "./BulkActionsBar";
 import { DealsAdvancedFilter, AdvancedFilterState } from "./DealsAdvancedFilter";
-import { DealActionItemsModal } from "./DealActionItemsModal";
+import { TaskModal } from "./tasks/TaskModal";
+import { useTasks } from "@/hooks/useTasks";
 import { DealActionsDropdown } from "./DealActionsDropdown";
 import { useToast } from "@/hooks/use-toast";
 
@@ -48,9 +49,10 @@ export const ListView = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50);
   
-  // Action Items Modal state
-  const [actionModalOpen, setActionModalOpen] = useState(false);
-  const [selectedDealForActions, setSelectedDealForActions] = useState<Deal | null>(null);
+  // Task Modal state
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [taskDealId, setTaskDealId] = useState<string | null>(null);
+  const { createTask } = useTasks();
 
   // Column customizer state
   const [columnCustomizerOpen, setColumnCustomizerOpen] = useState(false);
@@ -369,9 +371,9 @@ export const ListView = ({
   // Get selected deal objects for export
   const selectedDealObjects = deals.filter(deal => selectedDeals.has(deal.id));
 
-  const handleActionClick = (deal: Deal) => {
-    setSelectedDealForActions(deal);
-    setActionModalOpen(true);
+  const handleCreateTask = (deal: Deal) => {
+    setTaskDealId(deal.id);
+    setTaskModalOpen(true);
   };
 
   return (
@@ -524,9 +526,9 @@ export const ListView = ({
                       <RowActionsDropdown
                         actions={[
                           {
-                            label: "Action Items",
+                            label: "Create Task",
                             icon: <CheckSquare className="w-4 h-4" />,
-                            onClick: () => handleActionClick(deal)
+                            onClick: () => handleCreateTask(deal)
                           },
                           {
                             label: "Edit",
@@ -568,8 +570,8 @@ export const ListView = ({
         )}
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4">
-          <div className="flex flex-col sm:flex-row items-center gap-4 text-sm text-muted-foreground">
-            <span>Total: <strong>{filteredAndSortedDeals.length}</strong> deals</span>
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <span className="text-base font-semibold text-foreground">Total: <strong className="text-primary">{filteredAndSortedDeals.length}</strong> deals</span>
             {hasActiveFilters && (
               <div className="flex items-center gap-2">
                 <span>Active filters:</span>
@@ -617,10 +619,11 @@ export const ListView = ({
         </div>
       </div>
 
-      <DealActionItemsModal
-        open={actionModalOpen}
-        onOpenChange={setActionModalOpen}
-        deal={selectedDealForActions}
+      <TaskModal
+        open={taskModalOpen}
+        onOpenChange={setTaskModalOpen}
+        onSubmit={createTask}
+        context={taskDealId ? { module: 'deals', recordId: taskDealId, locked: true } : undefined}
       />
 
       <DealColumnCustomizer

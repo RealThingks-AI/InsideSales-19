@@ -26,12 +26,12 @@ export const RowActionsDropdown = ({ actions }: RowActionsDropdownProps) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-          <MoreHorizontal className="w-4 h-4" />
+        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="Open row actions menu">
+          <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
           <span className="sr-only">Open menu</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-48 bg-popover border border-border shadow-lg z-50">
         {actions.map((action, index) => (
           <React.Fragment key={index}>
             {action.separator && index > 0 && <DropdownMenuSeparator />}
@@ -39,8 +39,9 @@ export const RowActionsDropdown = ({ actions }: RowActionsDropdownProps) => {
               onClick={action.onClick}
               disabled={action.disabled}
               className={action.destructive ? "text-destructive focus:text-destructive" : ""}
+              aria-label={action.label}
             >
-              <span className="mr-2">{action.icon}</span>
+              <span className="mr-2" aria-hidden="true">{action.icon}</span>
               {action.label}
             </DropdownMenuItem>
           </React.Fragment>

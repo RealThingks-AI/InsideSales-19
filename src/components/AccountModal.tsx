@@ -17,16 +17,19 @@ import { X, ChevronDown } from "lucide-react";
 import { Account } from "./AccountTable";
 
 const accountSchema = z.object({
-  company_name: z.string().min(1, "Company name is required"),
-  email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  company_name: z.string()
+    .min(1, "Company name is required")
+    .min(2, "Company name must be at least 2 characters")
+    .max(100, "Company name must be less than 100 characters"),
+  email: z.string().email("Please enter a valid email address (e.g., contact@company.com)").optional().or(z.literal("")),
   region: z.string().optional(),
   country: z.string().optional(),
-  website: z.string().url("Invalid website URL").optional().or(z.literal("")),
-  company_type: z.string().optional(),
+  website: z.string().url("Please enter a valid URL (e.g., https://company.com)").optional().or(z.literal("")),
+  company_type: z.string().max(50, "Company type must be less than 50 characters").optional(),
   status: z.string().optional(),
-  notes: z.string().optional(),
+  notes: z.string().max(2000, "Notes must be less than 2000 characters").optional(),
   industry: z.string().optional(),
-  phone: z.string().optional(),
+  phone: z.string().max(20, "Phone number must be less than 20 characters").optional(),
 });
 
 type AccountFormData = z.infer<typeof accountSchema>;
@@ -410,11 +413,33 @@ export const AccountModal = ({ open, onOpenChange, account, onSuccess }: Account
                     <div className="flex items-center gap-1 flex-1 min-w-0">
                       {selectedTags.length > 0 ? (
                         <div className="flex gap-1 flex-wrap flex-1">
-                          {selectedTags.map((tag) => (
+                          {selectedTags.slice(0, 4).map((tag) => (
                             <Badge key={tag} variant="secondary" className="text-xs">
                               {tag}
                             </Badge>
                           ))}
+                          {selectedTags.length > 4 && (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Badge 
+                                  variant="outline" 
+                                  className="text-xs cursor-pointer hover:bg-muted"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  +{selectedTags.length - 4} more
+                                </Badge>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-2" side="top" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex flex-wrap gap-1 max-w-xs">
+                                  {selectedTags.slice(4).map((tag) => (
+                                    <Badge key={tag} variant="secondary" className="text-xs">
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
                         </div>
                       ) : (
                         <span className="text-muted-foreground">Select tags...</span>
@@ -472,7 +497,12 @@ export const AccountModal = ({ open, onOpenChange, account, onSuccess }: Account
                 Cancel
               </Button>
               <Button type="submit" disabled={loading}>
-                {loading ? "Saving..." : account ? "Save Changes" : "Add Account"}
+                {loading ? (
+                  <>
+                    <span className="animate-spin mr-2">⏳</span>
+                    {account ? "Saving..." : "Creating..."}
+                  </>
+                ) : account ? "Save Changes" : "Add Account"}
               </Button>
             </div>
           </form>

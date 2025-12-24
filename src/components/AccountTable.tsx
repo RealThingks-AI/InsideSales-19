@@ -329,7 +329,7 @@ const AccountTable = ({
                   <TableCell colSpan={visibleColumns.length + 2} className="text-center py-8">
                     No accounts found
                   </TableCell>
-                </TableRow> : pageAccounts.map(account => <TableRow key={account.id} className="hover:bg-muted/20 border-b">
+                </TableRow> : pageAccounts.map(account => <TableRow key={account.id} className="hover:bg-muted/20 border-b" data-state={selectedAccounts.includes(account.id) ? "selected" : undefined}>
                   <TableCell className="text-center px-4 py-3">
                     <div className="flex justify-center">
                       <Checkbox checked={selectedAccounts.includes(account.id)} onCheckedChange={checked => handleSelectAccount(account.id, checked as boolean)} />

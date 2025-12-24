@@ -332,6 +332,7 @@ export const MeetingModal = ({
   const [tzPopoverOpen, setTzPopoverOpen] = useState(false);
   const [tzTooltipOpen, setTzTooltipOpen] = useState(false);
   const tzListRef = useRef<HTMLDivElement | null>(null);
+  const timeListRef = useRef<HTMLDivElement | null>(null);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [timePopoverOpen, setTimePopoverOpen] = useState(false);
   const [endTimePopoverOpen, setEndTimePopoverOpen] = useState(false);
@@ -452,6 +453,23 @@ export const MeetingModal = ({
     });
   };
   const availableStartTimeSlots = useMemo(() => getAvailableTimeSlots(startDate), [startDate, timezone, nowInTimezone]);
+
+  // Scroll to selected/current time when time popover opens
+  useEffect(() => {
+    if (!timePopoverOpen) return;
+
+    const raf = requestAnimationFrame(() => {
+      // Try to scroll to selected time first, otherwise scroll to first available slot
+      const selectedEl = timeListRef.current?.querySelector(`[data-time="${startTime}"]`) as HTMLElement | null;
+      if (selectedEl) {
+        selectedEl.scrollIntoView({ block: "center" });
+      } else if (availableStartTimeSlots.length > 0) {
+        const firstAvailable = timeListRef.current?.querySelector(`[data-time="${availableStartTimeSlots[0]}"]`) as HTMLElement | null;
+        firstAvailable?.scrollIntoView({ block: "start" });
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [timePopoverOpen, startTime, availableStartTimeSlots]);
 
   // Calculate end time based on start time and duration
   const calculateEndDateTime = (start: Date, time: string, durationMinutes: number) => {
@@ -960,13 +978,23 @@ export const MeetingModal = ({
                     {formatDisplayTime(startTime)}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-28 p-1 z-50 max-h-48 overflow-y-auto" align="start">
-                  {availableStartTimeSlots.length > 0 ? availableStartTimeSlots.map(slot => <Button key={slot} variant={startTime === slot ? "secondary" : "ghost"} className="w-full justify-start text-xs h-7" onClick={() => {
-                  handleStartTimeChange(slot);
-                  setTimePopoverOpen(false);
-                }}>
+                <PopoverContent className="w-28 p-1 z-50 max-h-48 overflow-y-auto pointer-events-auto" align="start">
+                  <div ref={timeListRef} className="flex flex-col">
+                    {availableStartTimeSlots.length > 0 ? availableStartTimeSlots.map(slot => (
+                      <Button 
+                        key={slot} 
+                        data-time={slot}
+                        variant={startTime === slot ? "secondary" : "ghost"} 
+                        className="w-full justify-start text-xs h-7" 
+                        onClick={() => {
+                          handleStartTimeChange(slot);
+                          setTimePopoverOpen(false);
+                        }}
+                      >
                         {formatDisplayTime(slot)}
-                      </Button>) : <p className="text-xs text-muted-foreground p-2">No times available</p>}
+                      </Button>
+                    )) : <p className="text-xs text-muted-foreground p-2">No times available</p>}
+                  </div>
                 </PopoverContent>
               </Popover>
             </div>

@@ -8,10 +8,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Users, FileText, Briefcase, TrendingUp, Clock, CheckCircle2, ArrowRight, Plus, Settings2, Calendar, Activity, Bell, AlertCircle, Info, 
   Target, PieChart, LineChart, DollarSign, Mail, MessageSquare, CheckCircle, AlertTriangle, 
-  Globe, Building2, Star, Trophy, Gauge, ListTodo, PhoneCall, MapPin, Percent, ArrowUpRight, Filter, GripVertical
+  Globe, Building2, Star, Trophy, Gauge, ListTodo, PhoneCall, MapPin, Percent, ArrowUpRight, Filter, Move, Check
 } from "lucide-react";
-import { useState } from "react";
-import { DashboardCustomizeModal, WidgetKey, WidgetSize, WidgetSizeConfig, DEFAULT_WIDGETS } from "./DashboardCustomizeModal";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { DashboardCustomizeModal, WidgetKey, WidgetLayoutConfig, WidgetLayout, DEFAULT_WIDGETS } from "./DashboardCustomizeModal";
+import { ResizableDashboard } from "./ResizableDashboard";
 import { toast } from "sonner";
 import { format, isAfter, isBefore, addDays } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -19,13 +20,15 @@ import { TaskModal } from "@/components/tasks/TaskModal";
 import { MeetingModal } from "@/components/MeetingModal";
 import { useTasks } from "@/hooks/useTasks";
 import { Task } from "@/types/task";
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 
 const UserDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [isResizeMode, setIsResizeMode] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(1200);
   
   // Modal states for viewing records
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -35,6 +38,18 @@ const UserDashboard = () => {
   
   // Task operations
   const { createTask, updateTask, fetchTasks } = useTasks();
+
+  // Measure container width for grid layout
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth - 48); // subtract padding
+      }
+    };
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
   
   // Fetch display name directly from profiles table
   const { data: userName } = useQuery({
@@ -72,7 +87,7 @@ const UserDashboard = () => {
     enabled: !!user?.id,
   });
 
-  // Get visible widgets, order, and sizes from preferences or use defaults
+  // Get visible widgets, order, and layouts from preferences or use defaults
   const defaultWidgetKeys = DEFAULT_WIDGETS.map(w => w.key);
   const visibleWidgets: WidgetKey[] = dashboardPrefs?.visible_widgets 
     ? (dashboardPrefs.visible_widgets as WidgetKey[])
@@ -81,17 +96,17 @@ const UserDashboard = () => {
     ? (dashboardPrefs.card_order as WidgetKey[])
     : defaultWidgetKeys;
   
-  // Safely parse widget sizes - handle legacy string values gracefully
-  const parseWidgetSizes = (): WidgetSizeConfig => {
+  // Safely parse widget layouts - handle legacy string values gracefully
+  const parseWidgetLayouts = (): WidgetLayoutConfig => {
     if (!dashboardPrefs?.layout_view) return {};
     if (typeof dashboardPrefs.layout_view === 'object') {
-      return dashboardPrefs.layout_view as WidgetSizeConfig;
+      return dashboardPrefs.layout_view as WidgetLayoutConfig;
     }
     if (typeof dashboardPrefs.layout_view === 'string') {
       try {
         const parsed = JSON.parse(dashboardPrefs.layout_view);
         if (typeof parsed === 'object' && parsed !== null) {
-          return parsed as WidgetSizeConfig;
+          return parsed as WidgetLayoutConfig;
         }
       } catch {
         // Legacy string value like "grid" - ignore and use defaults
@@ -99,16 +114,19 @@ const UserDashboard = () => {
     }
     return {};
   };
-  const widgetSizes: WidgetSizeConfig = parseWidgetSizes();
+  const [widgetLayouts, setWidgetLayouts] = useState<WidgetLayoutConfig>(parseWidgetLayouts());
+
+  // Update layouts when preferences load
+  useEffect(() => {
+    setWidgetLayouts(parseWidgetLayouts());
+  }, [dashboardPrefs?.layout_view]);
 
   // Save dashboard preferences
   const savePreferencesMutation = useMutation({
-    mutationFn: async ({ widgets, order, sizes }: { widgets: WidgetKey[], order: WidgetKey[], sizes: WidgetSizeConfig }) => {
+    mutationFn: async ({ widgets, order, layouts }: { widgets: WidgetKey[], order: WidgetKey[], layouts: WidgetLayoutConfig }) => {
       if (!user?.id) {
         throw new Error("User not authenticated");
       }
-      
-      console.log("Saving dashboard preferences:", { widgets, order, sizes, userId: user.id });
       
       const { data, error } = await supabase
         .from('dashboard_preferences')
@@ -116,7 +134,7 @@ const UserDashboard = () => {
           user_id: user.id,
           visible_widgets: widgets,
           card_order: order,
-          layout_view: JSON.stringify(sizes),
+          layout_view: JSON.stringify(layouts),
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
         .select();
@@ -126,49 +144,51 @@ const UserDashboard = () => {
         throw error;
       }
       
-      console.log("Preferences saved successfully:", data);
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboard-prefs', user?.id] });
-      setCustomizeOpen(false);
-      toast.success("Dashboard preferences saved");
+      toast.success("Dashboard layout saved");
     },
     onError: (error) => {
       console.error("Mutation error:", error);
-      toast.error("Failed to save preferences");
+      toast.error("Failed to save layout");
     },
   });
 
-  // Handle drag and drop on dashboard
-  const handleDashboardDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
-    
-    const orderedVisible = widgetOrder.filter(w => visibleWidgets.includes(w));
-    const items = Array.from(orderedVisible);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-    
-    // Rebuild full order maintaining hidden widgets positions
-    const newOrder: WidgetKey[] = [];
-    const visibleSet = new Set(items);
-    let visibleIndex = 0;
-    
-    widgetOrder.forEach(key => {
-      if (visibleWidgets.includes(key)) {
-        newOrder.push(items[visibleIndex]);
-        visibleIndex++;
-      } else {
-        newOrder.push(key);
-      }
+  // Handle layout changes from ResizableDashboard
+  const handleLayoutChange = useCallback((newLayouts: WidgetLayoutConfig) => {
+    setWidgetLayouts(newLayouts);
+  }, []);
+
+  // Handle widget removal
+  const handleWidgetRemove = useCallback((key: WidgetKey) => {
+    const newVisible = visibleWidgets.filter(w => w !== key);
+    savePreferencesMutation.mutate({
+      widgets: newVisible,
+      order: widgetOrder,
+      layouts: widgetLayouts
     });
-    
-    // Save new order
-    savePreferencesMutation.mutate({ 
-      widgets: visibleWidgets, 
-      order: newOrder, 
-      sizes: widgetSizes 
+  }, [visibleWidgets, widgetOrder, widgetLayouts, savePreferencesMutation]);
+
+  // Handle widget addition
+  const handleWidgetAdd = useCallback((key: WidgetKey) => {
+    const newVisible = [...visibleWidgets, key];
+    savePreferencesMutation.mutate({
+      widgets: newVisible,
+      order: [...widgetOrder, key],
+      layouts: widgetLayouts
     });
+  }, [visibleWidgets, widgetOrder, widgetLayouts, savePreferencesMutation]);
+
+  // Save layout and exit resize mode
+  const handleSaveLayout = () => {
+    savePreferencesMutation.mutate({
+      widgets: visibleWidgets,
+      order: widgetOrder,
+      layouts: widgetLayouts
+    });
+    setIsResizeMode(false);
   };
 
   // Fetch user's leads count
@@ -198,15 +218,13 @@ const UserDashboard = () => {
     enabled: !!user?.id
   });
 
-  // Fetch user's deals count and value - check both created_by and lead_owner
+  // Fetch user's deals count and value
   const { data: dealsData, isLoading: dealsLoading } = useQuery({
     queryKey: ['user-deals-count', user?.id],
     queryFn: async () => {
-      // Fetch deals where user is either creator or lead owner
       const { data, error } = await supabase.from('deals').select('id, stage, total_contract_value, lead_owner, created_by');
       if (error) throw error;
       
-      // Filter deals that belong to current user (either as creator or lead owner)
       const userDeals = (data || []).filter(d => 
         d.created_by === user?.id || d.lead_owner === user?.id
       );
@@ -262,7 +280,7 @@ const UserDashboard = () => {
     enabled: !!user?.id
   });
 
-  // Fetch task reminders (due soon or overdue) - only for current user
+  // Fetch task reminders
   const { data: taskReminders } = useQuery({
     queryKey: ['user-task-reminders', user?.id],
     queryFn: async () => {
@@ -370,7 +388,7 @@ const UserDashboard = () => {
     enabled: !!user?.id
   });
 
-  // Fetch recent activities from security audit log - filter by current user
+  // Fetch recent activities
   const { data: recentActivities } = useQuery({
     queryKey: ['user-recent-activities', user?.id],
     queryFn: async () => {
@@ -385,7 +403,6 @@ const UserDashboard = () => {
       if (error) throw error;
 
       return (data || []).map(log => {
-        // Build detailed subject based on action type
         let detailedSubject = `${log.action} ${log.resource_type}`;
         const details = log.details as any;
         
@@ -443,7 +460,6 @@ const UserDashboard = () => {
   };
 
   const isLoading = leadsLoading || contactsLoading || dealsLoading || actionItemsLoading;
-  const isWidgetVisible = (key: WidgetKey) => visibleWidgets.includes(key);
 
   if (isLoading) {
     return (
@@ -456,7 +472,7 @@ const UserDashboard = () => {
     );
   }
 
-  // Placeholder widget component for widgets without real data yet
+  // Placeholder widget component
   const PlaceholderWidget = ({ title, icon, description }: { title: string; icon: React.ReactNode; description: string }) => (
     <Card className="h-full animate-fade-in">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -476,7 +492,7 @@ const UserDashboard = () => {
     switch (key) {
       case "leads":
         return (
-          <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer animate-fade-in" onClick={() => navigate('/leads')}>
+          <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer animate-fade-in" onClick={() => !isResizeMode && navigate('/leads')}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">My Leads</CardTitle>
               <FileText className="w-4 h-4 text-blue-600" />
@@ -489,7 +505,7 @@ const UserDashboard = () => {
         );
       case "contacts":
         return (
-          <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer animate-fade-in" onClick={() => navigate('/contacts')}>
+          <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer animate-fade-in" onClick={() => !isResizeMode && navigate('/contacts')}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">My Contacts</CardTitle>
               <Users className="w-4 h-4 text-green-600" />
@@ -502,7 +518,7 @@ const UserDashboard = () => {
         );
       case "deals":
         return (
-          <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer animate-fade-in" onClick={() => navigate('/deals')}>
+          <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer animate-fade-in" onClick={() => !isResizeMode && navigate('/deals')}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">My Deals</CardTitle>
               <Briefcase className="w-4 h-4 text-purple-600" />
@@ -515,7 +531,7 @@ const UserDashboard = () => {
         );
       case "actionItems":
         return (
-          <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer animate-fade-in" onClick={() => navigate('/tasks')}>
+          <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer animate-fade-in" onClick={() => !isResizeMode && navigate('/tasks')}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 Action Items
@@ -539,7 +555,7 @@ const UserDashboard = () => {
                 <Calendar className="w-5 h-5 text-primary" />
                 Upcoming Meetings
               </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/meetings')}>
+              <Button variant="ghost" size="sm" onClick={() => !isResizeMode && navigate('/meetings')}>
                 View All
               </Button>
             </CardHeader>
@@ -550,7 +566,7 @@ const UserDashboard = () => {
                     <div 
                       key={meeting.id} 
                       className="flex items-center justify-between p-2 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted/80 transition-colors"
-                      onClick={() => { setSelectedMeeting(meeting); setMeetingModalOpen(true); }}
+                      onClick={() => { if (!isResizeMode) { setSelectedMeeting(meeting); setMeetingModalOpen(true); }}}
                     >
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{meeting.subject}</p>
@@ -570,7 +586,7 @@ const UserDashboard = () => {
                 <div className="flex flex-col items-center justify-center py-6 text-center">
                   <Calendar className="w-8 h-8 text-muted-foreground/50 mb-2" />
                   <p className="text-sm text-muted-foreground">No upcoming meetings scheduled</p>
-                  <Button variant="link" size="sm" className="mt-1" onClick={() => navigate('/meetings')}>
+                  <Button variant="link" size="sm" className="mt-1" onClick={() => !isResizeMode && navigate('/meetings')}>
                     Schedule a meeting
                   </Button>
                 </div>
@@ -586,7 +602,7 @@ const UserDashboard = () => {
                 <Bell className="w-5 h-5 text-primary" />
                 Task Reminders
               </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/tasks')}>
+              <Button variant="ghost" size="sm" onClick={() => !isResizeMode && navigate('/tasks')}>
                 View All
               </Button>
             </CardHeader>
@@ -610,7 +626,7 @@ const UserDashboard = () => {
                               ? 'bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800'
                               : 'bg-muted/50'
                         }`}
-                        onClick={() => { setSelectedTask(task as Task); setTaskModalOpen(true); }}
+                        onClick={() => { if (!isResizeMode) { setSelectedTask(task as Task); setTaskModalOpen(true); }}}
                         title="Click to view task details"
                       >
                         <div className="min-w-0 flex-1">
@@ -645,7 +661,7 @@ const UserDashboard = () => {
                 <div className="flex flex-col items-center justify-center py-6 text-center">
                   <Bell className="w-8 h-8 text-muted-foreground/50 mb-2" />
                   <p className="text-sm text-muted-foreground">No pending tasks</p>
-                  <Button variant="link" size="sm" className="mt-1" onClick={() => navigate('/tasks')}>
+                  <Button variant="link" size="sm" className="mt-1" onClick={() => !isResizeMode && navigate('/tasks')}>
                     Create a task
                   </Button>
                 </div>
@@ -661,7 +677,7 @@ const UserDashboard = () => {
                 <Activity className="w-5 h-5 text-primary" />
                 Recent Activities
               </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/notifications')}>
+              <Button variant="ghost" size="sm" onClick={() => !isResizeMode && navigate('/notifications')}>
                 View All
               </Button>
             </CardHeader>
@@ -683,8 +699,6 @@ const UserDashboard = () => {
                       </div>
                     </div>
                   ))}
-                  {/* Scroll indicator gradient */}
-                  <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-card to-transparent pointer-events-none" />
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -744,7 +758,7 @@ const UserDashboard = () => {
               <Button 
                 variant="outline" 
                 className="w-full justify-between group hover:bg-primary hover:text-primary-foreground transition-colors" 
-                onClick={() => navigate('/leads')}
+                onClick={() => !isResizeMode && navigate('/leads')}
               >
                 <span className="flex items-center gap-2"><Plus className="w-4 h-4" />Add New Lead</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -752,7 +766,7 @@ const UserDashboard = () => {
               <Button 
                 variant="outline" 
                 className="w-full justify-between group hover:bg-primary hover:text-primary-foreground transition-colors" 
-                onClick={() => navigate('/contacts')}
+                onClick={() => !isResizeMode && navigate('/contacts')}
               >
                 <span className="flex items-center gap-2"><Plus className="w-4 h-4" />Add New Contact</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -760,7 +774,7 @@ const UserDashboard = () => {
               <Button 
                 variant="outline" 
                 className="w-full justify-between group hover:bg-primary hover:text-primary-foreground transition-colors" 
-                onClick={() => navigate('/deals')}
+                onClick={() => !isResizeMode && navigate('/deals')}
               >
                 <span className="flex items-center gap-2"><Plus className="w-4 h-4" />Create New Deal</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -788,40 +802,28 @@ const UserDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg" title="Leads with 'New' status">
+                <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
                   <p className="text-2xl font-bold text-blue-600">{leadsData?.new || 0}</p>
                   <p className="text-sm text-muted-foreground">New</p>
                 </div>
-                <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg" title="Leads you've contacted">
+                <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg">
                   <p className="text-2xl font-bold text-yellow-600">{leadsData?.contacted || 0}</p>
                   <p className="text-sm text-muted-foreground">Contacted</p>
                 </div>
-                <div className="text-center p-4 bg-green-50 dark:bg-green-950/20 rounded-lg" title="Leads that are qualified">
+                <div className="text-center p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
                   <p className="text-2xl font-bold text-green-600">{leadsData?.qualified || 0}</p>
                   <p className="text-sm text-muted-foreground">Qualified</p>
                 </div>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="text-center p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg cursor-help" title="Total leads you've created">
-                        <p className="text-2xl font-bold text-purple-600">{leadsData?.total || 0}</p>
-                        <p className="text-sm text-muted-foreground flex items-center justify-center gap-1">
-                          Total Leads
-                          <Info className="w-3 h-3" />
-                        </p>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Total number of leads you've created (all statuses)</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <div className="text-center p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
+                  <p className="text-2xl font-bold text-purple-600">{leadsData?.total || 0}</p>
+                  <p className="text-sm text-muted-foreground">Total Leads</p>
+                </div>
               </div>
             </CardContent>
           </Card>
         );
       
-      // New widget implementations
+      // Additional widgets with real data
       case "salesTarget":
         return (
           <Card className="h-full animate-fade-in">
@@ -840,7 +842,7 @@ const UserDashboard = () => {
         );
       case "pipelineValue":
         return (
-          <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer animate-fade-in" onClick={() => navigate('/deals')}>
+          <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer animate-fade-in" onClick={() => !isResizeMode && navigate('/deals')}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Pipeline Value</CardTitle>
               <DollarSign className="w-4 h-4 text-green-600" />
@@ -868,7 +870,7 @@ const UserDashboard = () => {
         );
       case "completedTasks":
         return (
-          <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer animate-fade-in" onClick={() => navigate('/tasks')}>
+          <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer animate-fade-in" onClick={() => !isResizeMode && navigate('/tasks')}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Completed Tasks</CardTitle>
               <CheckCircle className="w-4 h-4 text-green-600" />
@@ -881,7 +883,7 @@ const UserDashboard = () => {
         );
       case "overdueItems":
         return (
-          <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer animate-fade-in" onClick={() => navigate('/tasks')}>
+          <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer animate-fade-in" onClick={() => !isResizeMode && navigate('/tasks')}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Overdue Items</CardTitle>
               <AlertTriangle className="w-4 h-4 text-red-600" />
@@ -925,7 +927,7 @@ const UserDashboard = () => {
                 <Trophy className="w-5 h-5 text-amber-500" />
                 Top Deals
               </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/deals')}>
+              <Button variant="ghost" size="sm" onClick={() => !isResizeMode && navigate('/deals')}>
                 View All
               </Button>
             </CardHeader>
@@ -953,7 +955,7 @@ const UserDashboard = () => {
         );
       case "accountHealth":
         return (
-          <Card className="h-full animate-fade-in" onClick={() => navigate('/accounts')}>
+          <Card className="h-full animate-fade-in" onClick={() => !isResizeMode && navigate('/accounts')}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Account Health</CardTitle>
               <Building2 className="w-4 h-4 text-blue-600" />
@@ -1005,7 +1007,7 @@ const UserDashboard = () => {
           </Card>
         );
       
-      // Placeholder widgets for features that need more data
+      // Placeholder widgets
       case "revenueChart":
         return <PlaceholderWidget title="Revenue Chart" icon={<LineChart className="w-4 h-4 text-green-600" />} description="Revenue trends over time" />;
       case "dealForecast":
@@ -1031,24 +1033,8 @@ const UserDashboard = () => {
     }
   };
 
-  // Get widget size class with xs and xl support
-  const getWidgetSizeClass = (key: WidgetKey): string => {
-    const size = widgetSizes[key] || DEFAULT_WIDGETS.find(w => w.key === key)?.size || "medium";
-    switch (size) {
-      case "xs": return "col-span-1";
-      case "small": return "col-span-1 md:col-span-1";
-      case "medium": return "col-span-1 md:col-span-2 lg:col-span-2";
-      case "large": return "col-span-1 md:col-span-2 lg:col-span-3";
-      case "xl": return "col-span-1 md:col-span-2 lg:col-span-4 xl:col-span-6";
-      default: return "col-span-1";
-    }
-  };
-
-  // Get all visible widgets in order
-  const orderedVisibleWidgets = widgetOrder.filter(w => visibleWidgets.includes(w));
-
   return (
-    <div className="p-6 space-y-8">
+    <div className="p-6 space-y-8" ref={containerRef}>
       {/* Welcome Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="min-w-0 flex-1">
@@ -1056,48 +1042,48 @@ const UserDashboard = () => {
             Welcome back{userName ? `, ${userName}` : ''}!
           </h1>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setCustomizeOpen(true)} className="gap-2 flex-shrink-0">
-          <Settings2 className="w-4 h-4" />
-          Customize
-        </Button>
+        <div className="flex gap-2 flex-shrink-0">
+          {isResizeMode ? (
+            <Button onClick={handleSaveLayout} className="gap-2" disabled={savePreferencesMutation.isPending}>
+              <Check className="w-4 h-4" />
+              {savePreferencesMutation.isPending ? 'Saving...' : 'Done'}
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setIsResizeMode(true)} className="gap-2">
+                <Move className="w-4 h-4" />
+                Resize
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCustomizeOpen(true)} className="gap-2">
+                <Settings2 className="w-4 h-4" />
+                Customize
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Draggable Grid Layout */}
-      <DragDropContext onDragEnd={handleDashboardDragEnd}>
-        <Droppable droppableId="dashboard-widgets" direction="horizontal">
-          {(provided) => (
-            <div 
-              {...provided.droppableProps}
-              ref={provided.innerRef}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6"
-            >
-              {orderedVisibleWidgets.map((key, index) => (
-                <Draggable key={key} draggableId={key} index={index}>
-                  {(provided, snapshot) => (
-                    <div 
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      className={`${getWidgetSizeClass(key)} ${snapshot.isDragging ? 'z-50' : ''}`}
-                    >
-                      <div className={`relative group h-full ${snapshot.isDragging ? 'ring-2 ring-primary shadow-lg' : ''}`}>
-                        {/* Drag handle overlay */}
-                        <div 
-                          {...provided.dragHandleProps}
-                          className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing bg-background/80 backdrop-blur-sm p-1 rounded-md shadow-sm"
-                        >
-                          <GripVertical className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                        {renderWidget(key)}
-                      </div>
-                    </div>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
+      {/* Resize mode indicator */}
+      {isResizeMode && (
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center">
+          <p className="text-sm text-primary font-medium">
+            <Move className="w-4 h-4 inline mr-2" />
+            Resize Mode: Drag widgets to move, drag corners/edges to resize, click X to remove
+          </p>
+        </div>
+      )}
+
+      {/* Resizable Grid Layout */}
+      <ResizableDashboard
+        isResizeMode={isResizeMode}
+        visibleWidgets={visibleWidgets}
+        widgetLayouts={widgetLayouts}
+        onLayoutChange={handleLayoutChange}
+        onWidgetRemove={handleWidgetRemove}
+        onWidgetAdd={handleWidgetAdd}
+        renderWidget={renderWidget}
+        containerWidth={containerWidth}
+      />
 
       {/* Customize Modal */}
       <DashboardCustomizeModal
@@ -1105,12 +1091,14 @@ const UserDashboard = () => {
         onOpenChange={setCustomizeOpen}
         visibleWidgets={visibleWidgets}
         widgetOrder={widgetOrder}
-        widgetSizes={widgetSizes}
-        onSave={(widgets, order, sizes) => savePreferencesMutation.mutate({ widgets, order, sizes })}
+        onSave={(widgets, order) => {
+          savePreferencesMutation.mutate({ widgets, order, layouts: widgetLayouts });
+          setCustomizeOpen(false);
+        }}
         isSaving={savePreferencesMutation.isPending}
       />
       
-      {/* Task Modal for viewing/editing tasks */}
+      {/* Task Modal */}
       <TaskModal
         open={taskModalOpen}
         onOpenChange={(open) => {
@@ -1128,7 +1116,7 @@ const UserDashboard = () => {
         }}
       />
       
-      {/* Meeting Modal for viewing/editing meetings */}
+      {/* Meeting Modal */}
       <MeetingModal
         open={meetingModalOpen}
         onOpenChange={(open) => {

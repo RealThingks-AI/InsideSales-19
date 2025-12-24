@@ -3,12 +3,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { GripVertical, FileText, Users, Briefcase, Clock, TrendingUp, Zap, BarChart3, Calendar, Activity, Bell, Maximize2, Minimize2 } from "lucide-react";
+import { 
+  GripVertical, FileText, Users, Briefcase, Clock, TrendingUp, Zap, BarChart3, Calendar, Activity, Bell, 
+  Target, PieChart, LineChart, DollarSign, Mail, MessageSquare, CheckCircle, AlertTriangle, 
+  Globe, Building2, Star, Trophy, Gauge, ListTodo, PhoneCall, MapPin, Percent, ArrowUpRight, Filter
+} from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export type WidgetKey = "leads" | "contacts" | "deals" | "actionItems" | "performance" | "quickActions" | "leadStatus" | "upcomingMeetings" | "recentActivities" | "taskReminders";
-export type WidgetSize = "small" | "medium" | "large";
+export type WidgetKey = 
+  | "leads" | "contacts" | "deals" | "actionItems" | "performance" | "quickActions" 
+  | "leadStatus" | "upcomingMeetings" | "recentActivities" | "taskReminders"
+  | "salesTarget" | "revenueChart" | "pipelineValue" | "conversionRate" | "emailStats"
+  | "teamActivity" | "completedTasks" | "overdueItems" | "topDeals" | "regionStats"
+  | "accountHealth" | "customerRetention" | "winLossRatio" | "salesVelocity" | "taskProgress"
+  | "callLog" | "geoDistribution" | "dealForecast" | "growthTrend" | "leadSources";
+
+export type WidgetSize = "xs" | "small" | "medium" | "large" | "xl";
 
 export interface DashboardWidget {
   key: WidgetKey;
@@ -23,7 +34,7 @@ export interface WidgetSizeConfig {
 }
 
 const DEFAULT_WIDGETS: DashboardWidget[] = [
-  // Dashboard section - core widgets first
+  // Core widgets
   { key: "leads", label: "My Leads", icon: <FileText className="w-4 h-4" />, visible: true, size: "small" },
   { key: "contacts", label: "My Contacts", icon: <Users className="w-4 h-4" />, visible: true, size: "small" },
   { key: "deals", label: "My Deals", icon: <Briefcase className="w-4 h-4" />, visible: true, size: "small" },
@@ -32,9 +43,34 @@ const DEFAULT_WIDGETS: DashboardWidget[] = [
   { key: "upcomingMeetings", label: "Upcoming Meetings", icon: <Calendar className="w-4 h-4" />, visible: true, size: "medium" },
   { key: "taskReminders", label: "Task Reminders", icon: <Bell className="w-4 h-4" />, visible: true, size: "medium" },
   { key: "recentActivities", label: "Recent Activities", icon: <Activity className="w-4 h-4" />, visible: true, size: "medium" },
-  // Revenue Analytics section
   { key: "performance", label: "My Performance", icon: <TrendingUp className="w-4 h-4" />, visible: true, size: "large" },
   { key: "leadStatus", label: "Lead Status Overview", icon: <BarChart3 className="w-4 h-4" />, visible: true, size: "large" },
+  // Sales & Revenue widgets
+  { key: "salesTarget", label: "Sales Target", icon: <Target className="w-4 h-4" />, visible: false, size: "medium" },
+  { key: "revenueChart", label: "Revenue Chart", icon: <LineChart className="w-4 h-4" />, visible: false, size: "large" },
+  { key: "pipelineValue", label: "Pipeline Value", icon: <DollarSign className="w-4 h-4" />, visible: false, size: "small" },
+  { key: "conversionRate", label: "Conversion Rate", icon: <Percent className="w-4 h-4" />, visible: false, size: "small" },
+  { key: "dealForecast", label: "Deal Forecast", icon: <ArrowUpRight className="w-4 h-4" />, visible: false, size: "large" },
+  // Communication widgets
+  { key: "emailStats", label: "Email Statistics", icon: <Mail className="w-4 h-4" />, visible: false, size: "medium" },
+  { key: "callLog", label: "Call Log", icon: <PhoneCall className="w-4 h-4" />, visible: false, size: "medium" },
+  // Team & Activity widgets
+  { key: "teamActivity", label: "Team Activity", icon: <MessageSquare className="w-4 h-4" />, visible: false, size: "medium" },
+  { key: "completedTasks", label: "Completed Tasks", icon: <CheckCircle className="w-4 h-4" />, visible: false, size: "small" },
+  { key: "overdueItems", label: "Overdue Items", icon: <AlertTriangle className="w-4 h-4" />, visible: false, size: "small" },
+  { key: "taskProgress", label: "Task Progress", icon: <ListTodo className="w-4 h-4" />, visible: false, size: "medium" },
+  // Analytics widgets
+  { key: "topDeals", label: "Top Deals", icon: <Trophy className="w-4 h-4" />, visible: false, size: "medium" },
+  { key: "regionStats", label: "Region Statistics", icon: <Globe className="w-4 h-4" />, visible: false, size: "large" },
+  { key: "geoDistribution", label: "Geo Distribution", icon: <MapPin className="w-4 h-4" />, visible: false, size: "large" },
+  { key: "leadSources", label: "Lead Sources", icon: <Filter className="w-4 h-4" />, visible: false, size: "medium" },
+  // Account & Customer widgets
+  { key: "accountHealth", label: "Account Health", icon: <Building2 className="w-4 h-4" />, visible: false, size: "medium" },
+  { key: "customerRetention", label: "Customer Retention", icon: <Star className="w-4 h-4" />, visible: false, size: "small" },
+  // Performance widgets
+  { key: "winLossRatio", label: "Win/Loss Ratio", icon: <PieChart className="w-4 h-4" />, visible: false, size: "small" },
+  { key: "salesVelocity", label: "Sales Velocity", icon: <Gauge className="w-4 h-4" />, visible: false, size: "medium" },
+  { key: "growthTrend", label: "Growth Trend", icon: <TrendingUp className="w-4 h-4" />, visible: false, size: "large" },
 ];
 
 interface DashboardCustomizeModalProps {
@@ -126,9 +162,21 @@ export const DashboardCustomizeModal = ({
 
   const getSizeLabel = (size: WidgetSize) => {
     switch (size) {
+      case "xs": return "XS";
       case "small": return "S";
       case "medium": return "M";
       case "large": return "L";
+      case "xl": return "XL";
+    }
+  };
+
+  const getSizeColor = (size: WidgetSize) => {
+    switch (size) {
+      case "xs": return 'bg-purple-100 dark:bg-purple-900/30 border-purple-300';
+      case "small": return 'bg-blue-100 dark:bg-blue-900/30 border-blue-300';
+      case "medium": return 'bg-amber-100 dark:bg-amber-900/30 border-amber-300';
+      case "large": return 'bg-green-100 dark:bg-green-900/30 border-green-300';
+      case "xl": return 'bg-rose-100 dark:bg-rose-900/30 border-rose-300';
     }
   };
 
@@ -184,17 +232,15 @@ export const DashboardCustomizeModal = ({
                               value={widget.size}
                               onValueChange={(value: WidgetSize) => changeSize(widget.key, value)}
                             >
-                              <SelectTrigger className={`w-[80px] h-8 text-xs font-medium ${
-                                widget.size === 'small' ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-300' :
-                                widget.size === 'medium' ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-300' :
-                                'bg-green-100 dark:bg-green-900/30 border-green-300'
-                              }`}>
+                            <SelectTrigger className={`w-[90px] h-8 text-xs font-medium ${getSizeColor(widget.size)}`}>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent className="bg-popover border shadow-lg">
+                                <SelectItem value="xs" className="data-[state=checked]:bg-purple-100 dark:data-[state=checked]:bg-purple-900/30">Extra Small</SelectItem>
                                 <SelectItem value="small" className="data-[state=checked]:bg-blue-100 dark:data-[state=checked]:bg-blue-900/30">Small</SelectItem>
                                 <SelectItem value="medium" className="data-[state=checked]:bg-amber-100 dark:data-[state=checked]:bg-amber-900/30">Medium</SelectItem>
                                 <SelectItem value="large" className="data-[state=checked]:bg-green-100 dark:data-[state=checked]:bg-green-900/30">Large</SelectItem>
+                                <SelectItem value="xl" className="data-[state=checked]:bg-rose-100 dark:data-[state=checked]:bg-rose-900/30">Extra Large</SelectItem>
                               </SelectContent>
                             </Select>
                             <Switch

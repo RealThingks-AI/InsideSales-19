@@ -978,22 +978,31 @@ export const MeetingModal = ({
                     {formatDisplayTime(startTime)}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-28 p-1 z-50 max-h-48 overflow-y-auto pointer-events-auto" align="start">
-                  <div ref={timeListRef} className="flex flex-col">
-                    {availableStartTimeSlots.length > 0 ? availableStartTimeSlots.map(slot => (
-                      <Button 
-                        key={slot} 
-                        data-time={slot}
-                        variant={startTime === slot ? "secondary" : "ghost"} 
-                        className="w-full justify-start text-xs h-7" 
-                        onClick={() => {
-                          handleStartTimeChange(slot);
-                          setTimePopoverOpen(false);
-                        }}
-                      >
-                        {formatDisplayTime(slot)}
-                      </Button>
-                    )) : <p className="text-xs text-muted-foreground p-2">No times available</p>}
+                <PopoverContent className="w-28 p-1 z-50 pointer-events-auto" align="start">
+                  <div
+                    ref={timeListRef}
+                    className="max-h-48 overflow-y-auto overscroll-contain pointer-events-auto flex flex-col"
+                    onWheelCapture={(e) => e.stopPropagation()}
+                    onTouchMove={(e) => e.stopPropagation()}
+                  >
+                    {availableStartTimeSlots.length > 0 ? (
+                      availableStartTimeSlots.map((slot) => (
+                        <Button
+                          key={slot}
+                          data-time={slot}
+                          variant={startTime === slot ? "secondary" : "ghost"}
+                          className="w-full justify-start text-xs h-7"
+                          onClick={() => {
+                            handleStartTimeChange(slot);
+                            setTimePopoverOpen(false);
+                          }}
+                        >
+                          {formatDisplayTime(slot)}
+                        </Button>
+                      ))
+                    ) : (
+                      <p className="text-xs text-muted-foreground p-2">No times available</p>
+                    )}
                   </div>
                 </PopoverContent>
               </Popover>

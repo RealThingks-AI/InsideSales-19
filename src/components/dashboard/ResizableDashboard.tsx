@@ -1,28 +1,15 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import GridLayout from "react-grid-layout";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  X, Plus, Check,
-  Users, FileText, Briefcase, TrendingUp, Clock, CheckCircle2, ArrowRight, Calendar, Activity, Bell, AlertCircle, Info, 
+  X, Plus, GripVertical,
+  Users, FileText, Briefcase, TrendingUp, Clock, Calendar, Activity, Bell, 
   Target, PieChart, LineChart, DollarSign, Mail, MessageSquare, CheckCircle, AlertTriangle, 
   Globe, Building2, Star, Trophy, Gauge, ListTodo, PhoneCall, MapPin, Percent, ArrowUpRight, Filter
 } from "lucide-react";
 import { WidgetKey, DEFAULT_WIDGETS, WidgetLayoutConfig, WidgetLayout } from "./DashboardCustomizeModal";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import "react-grid-layout/css/styles.css";
-import "react-resizable/css/styles.css";
-
-interface LayoutItem {
-  i: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  minW?: number;
-  minH?: number;
-}
 
 interface ResizableDashboardProps {
   isResizeMode: boolean;
@@ -45,41 +32,112 @@ export const ResizableDashboard = ({
   renderWidget,
   containerWidth,
 }: ResizableDashboardProps) => {
-  const COLS = 12;
-  const ROW_HEIGHT = 80;
-  const MARGIN: [number, number] = [16, 16];
+  const [draggedWidget, setDraggedWidget] = useState<WidgetKey | null>(null);
+  const [resizingWidget, setResizingWidget] = useState<WidgetKey | null>(null);
+  const [resizeStart, setResizeStart] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
-  // Convert widget layouts to react-grid-layout format
-  const layout: LayoutItem[] = useMemo(() => {
-    return visibleWidgets.map((key) => {
-      const savedLayout = widgetLayouts[key];
-      const defaultWidget = DEFAULT_WIDGETS.find(w => w.key === key);
-      const defaultLayout = defaultWidget?.defaultLayout || { x: 0, y: 0, w: 3, h: 2 };
+  // Get layout for a widget with defaults
+  const getWidgetLayout = (key: WidgetKey): WidgetLayout => {
+    const saved = widgetLayouts[key];
+    const defaultWidget = DEFAULT_WIDGETS.find(w => w.key === key);
+    const defaultLayout = defaultWidget?.defaultLayout || { x: 0, y: 0, w: 3, h: 2 };
+    return {
+      x: saved?.x ?? defaultLayout.x,
+      y: saved?.y ?? defaultLayout.y,
+      w: saved?.w ?? defaultLayout.w,
+      h: saved?.h ?? defaultLayout.h,
+    };
+  };
+
+  // Calculate grid column span
+  const getGridSpan = (key: WidgetKey) => {
+    const layout = getWidgetLayout(key);
+    return {
+      gridColumn: `span ${Math.min(layout.w, 12)}`,
+      gridRow: `span ${layout.h}`,
+    };
+  };
+
+  // Handle resize start
+  const handleResizeStart = (e: React.MouseEvent, key: WidgetKey, corner: string) => {
+    if (!isResizeMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const layout = getWidgetLayout(key);
+    setResizingWidget(key);
+    setResizeStart({ x: e.clientX, y: e.clientY, w: layout.w, h: layout.h });
+  };
+
+  // Handle resize move
+  useEffect(() => {
+    if (!resizingWidget || !resizeStart) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - resizeStart.x;
+      const deltaY = e.clientY - resizeStart.y;
       
-      return {
-        i: key,
-        x: savedLayout?.x ?? defaultLayout.x,
-        y: savedLayout?.y ?? defaultLayout.y,
-        w: savedLayout?.w ?? defaultLayout.w,
-        h: savedLayout?.h ?? defaultLayout.h,
-        minW: 2,
-        minH: 2,
+      // Calculate new size based on drag distance (100px per grid unit)
+      const newW = Math.max(2, Math.min(12, Math.round(resizeStart.w + deltaX / 100)));
+      const newH = Math.max(2, Math.round(resizeStart.h + deltaY / 60));
+      
+      const newLayouts = { ...widgetLayouts };
+      const currentLayout = getWidgetLayout(resizingWidget);
+      newLayouts[resizingWidget] = {
+        ...currentLayout,
+        w: newW,
+        h: newH,
       };
-    });
-  }, [visibleWidgets, widgetLayouts]);
+      onLayoutChange(newLayouts);
+    };
 
-  const handleLayoutChange = useCallback((newLayout: LayoutItem[]) => {
-    const newLayouts: WidgetLayoutConfig = {};
-    newLayout.forEach(item => {
-      newLayouts[item.i] = {
-        x: item.x,
-        y: item.y,
-        w: item.w,
-        h: item.h,
-      };
-    });
+    const handleMouseUp = () => {
+      setResizingWidget(null);
+      setResizeStart(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [resizingWidget, resizeStart, widgetLayouts, onLayoutChange]);
+
+  // Handle drag start
+  const handleDragStart = (e: React.DragEvent, key: WidgetKey) => {
+    if (!isResizeMode) return;
+    setDraggedWidget(key);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  // Handle drag over
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  // Handle drop - swap widgets
+  const handleDrop = (e: React.DragEvent, targetKey: WidgetKey) => {
+    e.preventDefault();
+    if (!draggedWidget || draggedWidget === targetKey) {
+      setDraggedWidget(null);
+      return;
+    }
+
+    // Swap layouts
+    const draggedLayout = getWidgetLayout(draggedWidget);
+    const targetLayout = getWidgetLayout(targetKey);
+    
+    const newLayouts = { ...widgetLayouts };
+    newLayouts[draggedWidget] = { ...targetLayout };
+    newLayouts[targetKey] = { ...draggedLayout };
+    
     onLayoutChange(newLayouts);
-  }, [onLayoutChange]);
+    setDraggedWidget(null);
+  };
 
   // Get widgets that can be added
   const availableWidgets = DEFAULT_WIDGETS.filter(w => !visibleWidgets.includes(w.key));
@@ -117,77 +175,93 @@ export const ResizableDashboard = ({
         </div>
       )}
 
-      <GridLayout
-        className="layout"
-        layout={layout}
-        cols={COLS}
-        rowHeight={ROW_HEIGHT}
-        width={containerWidth}
-        margin={MARGIN}
-        isDraggable={isResizeMode}
-        isResizable={isResizeMode}
-        onLayoutChange={handleLayoutChange}
-        draggableHandle=".widget-drag-handle"
-        resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 'n', 's']}
-        compactType="vertical"
-        preventCollision={false}
+      {/* Grid Layout */}
+      <div 
+        ref={gridRef}
+        className="grid gap-4"
+        style={{
+          gridTemplateColumns: 'repeat(12, 1fr)',
+          gridAutoRows: '80px',
+        }}
       >
-        {visibleWidgets.map(key => (
-          <div 
-            key={key} 
-            className={`widget-container ${isResizeMode ? 'resize-mode-widget' : ''}`}
-          >
-            <div className={`relative h-full ${isResizeMode ? 'animate-wiggle' : ''}`}>
-              {isResizeMode && (
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute -top-2 -right-2 z-20 h-6 w-6 rounded-full shadow-lg"
-                  onClick={() => onWidgetRemove(key)}
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-              )}
-              
-              {isResizeMode && (
-                <div className="widget-drag-handle absolute inset-0 z-10 cursor-move bg-transparent" />
-              )}
-              
-              <div className={`h-full ${isResizeMode ? 'pointer-events-none' : ''}`}>
-                {renderWidget(key)}
+        {visibleWidgets.map(key => {
+          const gridSpan = getGridSpan(key);
+          const isDragging = draggedWidget === key;
+          const isResizing = resizingWidget === key;
+          
+          return (
+            <div
+              key={key}
+              className={`relative transition-all duration-200 ${
+                isResizeMode ? 'resize-mode-widget' : ''
+              } ${isDragging ? 'opacity-50' : ''} ${isResizing ? 'ring-2 ring-primary' : ''}`}
+              style={gridSpan}
+              draggable={isResizeMode}
+              onDragStart={(e) => handleDragStart(e, key)}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, key)}
+            >
+              <div className={`relative h-full ${isResizeMode ? 'animate-wiggle' : ''}`}>
+                {/* Remove button */}
+                {isResizeMode && (
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 z-20 h-6 w-6 rounded-full shadow-lg"
+                    onClick={(e) => { e.stopPropagation(); onWidgetRemove(key); }}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                )}
+                
+                {/* Drag handle */}
+                {isResizeMode && (
+                  <div className="absolute top-2 left-2 z-20 cursor-grab active:cursor-grabbing bg-background/90 backdrop-blur-sm p-1.5 rounded-md shadow-sm border">
+                    <GripVertical className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                )}
+                
+                {/* Resize handles */}
+                {isResizeMode && (
+                  <>
+                    <div 
+                      className="absolute bottom-0 right-0 w-4 h-4 bg-primary rounded-tl cursor-se-resize z-20 opacity-80 hover:opacity-100"
+                      onMouseDown={(e) => handleResizeStart(e, key, 'se')}
+                    />
+                    <div 
+                      className="absolute bottom-0 left-0 right-4 h-2 bg-primary/30 cursor-s-resize z-20 opacity-0 hover:opacity-80 rounded-bl"
+                      onMouseDown={(e) => handleResizeStart(e, key, 's')}
+                    />
+                    <div 
+                      className="absolute top-0 bottom-4 right-0 w-2 bg-primary/30 cursor-e-resize z-20 opacity-0 hover:opacity-80 rounded-tr"
+                      onMouseDown={(e) => handleResizeStart(e, key, 'e')}
+                    />
+                  </>
+                )}
+                
+                {/* Widget content */}
+                <div className={`h-full ${isResizeMode ? 'pointer-events-none select-none' : ''}`}>
+                  {renderWidget(key)}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </GridLayout>
+          );
+        })}
+      </div>
 
       <style>{`
         @keyframes wiggle {
-          0%, 100% { transform: rotate(-0.5deg); }
-          50% { transform: rotate(0.5deg); }
+          0%, 100% { transform: rotate(-0.3deg); }
+          50% { transform: rotate(0.3deg); }
         }
-        .animate-wiggle { animation: wiggle 0.3s ease-in-out infinite; }
-        .resize-mode-widget { transition: box-shadow 0.2s ease; }
-        .resize-mode-widget:hover { box-shadow: 0 0 0 2px hsl(var(--primary) / 0.5); }
-        .react-grid-item.react-grid-placeholder {
-          background: hsl(var(--primary) / 0.2) !important;
-          border: 2px dashed hsl(var(--primary)) !important;
-          border-radius: 0.5rem;
+        .animate-wiggle { animation: wiggle 0.25s ease-in-out infinite; }
+        .resize-mode-widget { 
+          transition: box-shadow 0.2s ease, transform 0.2s ease; 
         }
-        .react-resizable-handle {
-          position: absolute; width: 20px; height: 20px;
-          background: hsl(var(--primary)); border-radius: 4px;
-          opacity: 0; transition: opacity 0.2s;
+        .resize-mode-widget:hover { 
+          box-shadow: 0 0 0 2px hsl(var(--primary) / 0.5);
+          z-index: 10;
         }
-        .resize-mode-widget:hover .react-resizable-handle { opacity: 1; }
-        .react-resizable-handle-se { bottom: 0; right: 0; cursor: se-resize; }
-        .react-resizable-handle-sw { bottom: 0; left: 0; cursor: sw-resize; }
-        .react-resizable-handle-ne { top: 0; right: 0; cursor: ne-resize; }
-        .react-resizable-handle-nw { top: 0; left: 0; cursor: nw-resize; }
-        .react-resizable-handle-e { right: 0; top: 50%; transform: translateY(-50%); cursor: e-resize; }
-        .react-resizable-handle-w { left: 0; top: 50%; transform: translateY(-50%); cursor: w-resize; }
-        .react-resizable-handle-n { top: 0; left: 50%; transform: translateX(-50%); cursor: n-resize; }
-        .react-resizable-handle-s { bottom: 0; left: 50%; transform: translateX(-50%); cursor: s-resize; }
       `}</style>
     </div>
   );

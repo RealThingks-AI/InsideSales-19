@@ -378,29 +378,35 @@ export type Database = {
         Row: {
           card_order: Json | null
           created_at: string | null
+          dashboard_view: string | null
           id: string
           layout_view: string | null
           updated_at: string | null
           user_id: string
           visible_widgets: Json | null
+          widget_layouts: Json | null
         }
         Insert: {
           card_order?: Json | null
           created_at?: string | null
+          dashboard_view?: string | null
           id?: string
           layout_view?: string | null
           updated_at?: string | null
           user_id: string
           visible_widgets?: Json | null
+          widget_layouts?: Json | null
         }
         Update: {
           card_order?: Json | null
           created_at?: string | null
+          dashboard_view?: string | null
           id?: string
           layout_view?: string | null
           updated_at?: string | null
           user_id?: string
           visible_widgets?: Json | null
+          widget_layouts?: Json | null
         }
         Relationships: []
       }

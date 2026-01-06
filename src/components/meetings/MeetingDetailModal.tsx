@@ -273,10 +273,11 @@ export const MeetingDetailModal = ({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="followups">Follow-ups</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="related">Related</TabsTrigger>
           </TabsList>
 
@@ -368,6 +369,21 @@ export const MeetingDetailModal = ({
           </TabsContent>
 
           <TabsContent value="activity" className="mt-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Meeting Notes & Activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {meeting.notes ? (
+                  <p className="text-sm whitespace-pre-wrap">{meeting.notes}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No notes recorded for this meeting</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="history" className="mt-4">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Change History</CardTitle>

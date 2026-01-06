@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Phone, 
   Mail, 
@@ -16,10 +14,9 @@ import {
   Loader2,
   UserPlus,
   Video,
-  History
 } from "lucide-react";
 import { format } from "date-fns";
-import { RecordChangeHistory } from "@/components/shared/RecordChangeHistory";
+import { ActivityDetailModal } from "@/components/shared/ActivityDetailModal";
 
 interface TimelineItem {
   id: string;
@@ -60,7 +57,7 @@ const getActivityColor = (type: string) => {
 export const AccountActivityTimeline = ({ accountId }: AccountActivityTimelineProps) => {
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('activities');
+  const [selectedActivity, setSelectedActivity] = useState<TimelineItem | null>(null);
 
   useEffect(() => {
     fetchTimeline();
@@ -130,7 +127,8 @@ export const AccountActivityTimeline = ({ accountId }: AccountActivityTimelinePr
           icon: getActivityIcon(activity.activity_type),
           metadata: {
             type: activity.activity_type,
-            outcome: activity.outcome || ''
+            outcome: activity.outcome || '',
+            duration: activity.duration_minutes?.toString() || ''
           }
         });
       });
@@ -198,33 +196,37 @@ export const AccountActivityTimeline = ({ accountId }: AccountActivityTimelinePr
     }
   };
 
-  const renderActivities = () => {
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      );
-    }
-
-    if (timeline.length === 0) {
-      return (
-        <div className="text-center py-8 text-muted-foreground">
-          <Clock className="h-12 w-12 mx-auto mb-2 opacity-50" />
-          <p>No activity yet</p>
-        </div>
-      );
-    }
-
+  if (loading) {
     return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (timeline.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <Clock className="h-12 w-12 mx-auto mb-2 opacity-50" />
+        <p>No activity yet</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
       <ScrollArea className="h-[350px]">
         <div className="relative pl-6">
           {/* Timeline line */}
           <div className="absolute left-2 top-2 bottom-2 w-0.5 bg-border" />
           
           <div className="space-y-4">
-            {timeline.map((item, index) => (
-              <div key={item.id} className="relative">
+            {timeline.map((item) => (
+              <div 
+                key={item.id} 
+                className="relative cursor-pointer"
+                onClick={() => setSelectedActivity(item)}
+              >
                 {/* Timeline dot */}
                 <div className={`absolute -left-4 mt-1.5 w-4 h-4 rounded-full flex items-center justify-center ${
                   item.type === 'activity' 
@@ -269,29 +271,12 @@ export const AccountActivityTimeline = ({ accountId }: AccountActivityTimelinePr
           </div>
         </div>
       </ScrollArea>
-    );
-  };
 
-  return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-2 mb-4">
-        <TabsTrigger value="activities" className="gap-2">
-          <Clock className="h-4 w-4" />
-          Activities
-        </TabsTrigger>
-        <TabsTrigger value="history" className="gap-2">
-          <History className="h-4 w-4" />
-          Change History
-        </TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="activities">
-        {renderActivities()}
-      </TabsContent>
-
-      <TabsContent value="history">
-        <RecordChangeHistory entityType="accounts" entityId={accountId} maxHeight="350px" />
-      </TabsContent>
-    </Tabs>
+      <ActivityDetailModal
+        open={!!selectedActivity}
+        onOpenChange={(open) => !open && setSelectedActivity(null)}
+        activity={selectedActivity}
+      />
+    </>
   );
 };

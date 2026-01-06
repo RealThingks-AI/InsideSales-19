@@ -434,14 +434,8 @@ const Meetings = () => {
     }
   };
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading meetings...</p>
-        </div>
-      </div>;
-  }
+  // Show skeleton instead of blocking full-screen loader
+  const showSkeleton = loading && meetings.length === 0;
 
   return <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Hidden file input for import */}
@@ -529,7 +523,12 @@ const Meetings = () => {
 
       {/* Main Content */}
       <div className="flex-1 min-h-0 overflow-hidden px-4 pt-2 pb-4 flex flex-col">
-        {viewMode === 'calendar' ? (
+        {showSkeleton ? (
+          <div className="space-y-4 flex-1">
+            <div className="h-10 bg-muted animate-pulse rounded" />
+            <div className="h-64 bg-muted animate-pulse rounded" />
+          </div>
+        ) : viewMode === 'calendar' ? (
           <div className="flex-1 min-h-0 overflow-auto">
             <MeetingsCalendarView
               meetings={filteredMeetings}

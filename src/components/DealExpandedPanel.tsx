@@ -593,7 +593,7 @@ const StakeholdersSection = ({ deal, queryClient }: {deal: Deal;queryClient: Ret
                   {stakeholders.filter((s) => s.note).length === 0 && !editingNote ? "No stakeholder notes yet." : "No matching notes."}
                 </p> :
 
-              <div className="space-y-2 max-h-[280px] overflow-y-auto">
+              <div className="space-y-2 max-h-[196px] overflow-y-auto">
                   {displayedNotes.map((s) =>
               <div key={s.id} className="rounded-lg bg-muted/50 border border-border/40 p-2.5">
                     {/* Header row */}

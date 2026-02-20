@@ -1,104 +1,73 @@
-# Fix Unresponsive Form Fields in Modal Dialogs
 
-## Problem Analysis
 
-The user reported that when creating a task in the Account section, the form fields (particularly Select dropdowns, Calendar popovers, and other interactive elements) are not responsive/clickable.
+## Fix: Info Icon Should Open Note Editor for Specific Contact Only
 
 ### Root Cause
+Two issues found in `src/components/DealExpandedPanel.tsx`:
 
-The issue is a **z-index stacking context conflict** between the Dialog component and its child components (Select, Popover, Calendar):
+1. **`stakeholdersWithNotes` filters out contacts without notes** (line 449: `stakeholders.filter((s) => s.note)`). When clicking the info icon on a contact that has no note yet, `editingNote` is set to that stakeholder's ID, but that stakeholder is excluded from the rendered list -- so nothing appears or the panel shows only other contacts' notes.
 
-1. **Dialog** uses `z-50` for both the overlay and content
-2. **Select/Popover/Calendar** dropdowns also use `z-50`
-3. When a Select dropdown opens inside a Dialog, it renders in a portal at the same z-level as the Dialog, causing:
-   - Dropdowns appearing behind the dialog overlay
-   - Click events being intercepted by the overlay
-   - Fields appearing unresponsive
+2. **All notes are shown at once** when the panel opens. The user expects that clicking the info/add button for a specific contact should show/edit only that contact's note, not display all stakeholder notes.
 
-### Affected Components
+### Changes (single file: `src/components/DealExpandedPanel.tsx`)
 
-Based on analysis, these modal components use Select/Popover inside Dialogs and may have the same issue:
+**1. Include the actively-edited stakeholder in the filtered list (line 449)**
+Change the filter from:
+```
+stakeholders.filter((s) => s.note)
+```
+to:
+```
+stakeholders.filter((s) => s.note || s.id === editingNote)
+```
+Also add `editingNote` to the `useMemo` dependency array (line 457).
 
-1. `src/components/tasks/TaskModal.tsx` - Task creation (primary issue reported)
-2. `src/components/AccountModal.tsx` - Account creation/editing
-3. `src/components/ContactModal.tsx` - Contact creation/editing
-4. `src/components/LeadModal.tsx` - Lead creation/editing
-5. `src/components/MeetingModal.tsx` - Meeting creation/editing
-6. `src/components/DealForm.tsx` - Deal form fields
-7. Various detail modals with editable fields
+**2. When info icon is clicked, show only that contact's note card**
+Instead of showing all notes when the summary panel opens from the info icon click, filter the displayed list to only the stakeholder being edited. This can be done by:
+- Adding a state like `focusedNoteId` (set when info icon is clicked, cleared when the panel is manually toggled via the "Notes" button).
+- When `focusedNoteId` is set, render only the matching stakeholder card instead of the full `stakeholdersWithNotes` list.
+- When the user clicks the "Notes (N)" toggle button at the top, clear `focusedNoteId` so all notes are shown as before.
 
-## Solution
+**3. Update the info icon click handler (line 541-544)**
+Set `focusedNoteId` alongside the existing state updates:
+```
+onClick={() => {
+  setShowNotesSummary(true);
+  setFocusedNoteId(sh.id);
+  setEditingNote(sh.id);
+  setNoteText(formatWithBullets(sh.note || ""));
+}}
+```
 
-### Approach: Increase z-index for dropdown portals inside dialogs
+**4. Update the "Notes (N)" toggle button**
+When toggling the panel via the Notes button, clear `focusedNoteId` so all notes display:
+```
+onClick={() => {
+  setShowNotesSummary(!showNotesSummary);
+  setFocusedNoteId(null);
+}}
+```
 
-The fix involves updating the UI components to use higher z-index values when rendering inside dialogs. We have two options:
+**5. Filter the rendered list based on focus**
+In the rendering section (line 591), use a computed list:
+```
+const displayedNotes = focusedNoteId
+  ? stakeholdersWithNotes.filter(s => s.id === focusedNoteId)
+  : stakeholdersWithNotes;
+```
+Then map over `displayedNotes` instead of `stakeholdersWithNotes`.
 
-**Option A (Recommended): Update base UI components**
-- Update `SelectContent` to use `z-[100]` instead of `z-50`
-- Update `PopoverContent` to use `z-[100]` instead of `z-50`
-- This fixes the issue globally for all modals
+**6. Clear focusedNoteId on save/cancel/delete**
+Reset `focusedNoteId` to `null` in the save handler, cancel button, and delete confirmation so the panel reverts to showing all notes after editing completes.
 
-**Option B: Add `pointer-events-auto` and higher z-index per usage**
-- Add `className="z-[100] pointer-events-auto"` to each SelectContent/PopoverContent inside dialogs
-- More targeted but requires changes in many files
+### Summary
 
-## Implementation Steps
+| Change | Location | Purpose |
+|--------|----------|---------|
+| Include editing stakeholder in filter | Line 449 | Show card for contacts without existing notes |
+| Add `focusedNoteId` state | Near line 310 | Track which contact's note to isolate |
+| Set focus on info icon click | Line 541 | Isolate to clicked contact |
+| Clear focus on Notes toggle | Notes button onClick | Show all notes when toggled manually |
+| Filter displayed list | Line 591 | Render only focused contact or all |
+| Clear focus on save/cancel/delete | Various handlers | Return to full view after editing |
 
-### Step 1: Update Select Component (src/components/ui/select.tsx)
-- Change `SelectContent` z-index from `z-50` to `z-[100]`
-- Line 76: Update the className from `relative z-50` to `relative z-[100]`
-
-### Step 2: Update Popover Component (src/components/ui/popover.tsx)
-- Change `PopoverContent` z-index from `z-50` to `z-[100]`
-- Line 20: Update the className from `z-50` to `z-[100]`
-
-### Step 3: Update Tooltip Component (src/components/ui/tooltip.tsx)
-- Verify and update TooltipContent z-index if needed (should be `z-[100]`)
-- This ensures tooltips also appear above dialogs
-
-### Step 4: Verify Calendar interactions
-- The Calendar component already has `pointer-events-auto` class in TaskModal.tsx (line 641)
-- Verify this pattern is applied in all modal calendar usages
-
-## Testing Checklist
-
-After implementation, test these scenarios across ALL modules:
-
-- [ ] Task Modal (Accounts section):
-  - [ ] Module selector dropdown works
-  - [ ] Account selector dropdown works
-  - [ ] Assigned To dropdown works
-  - [ ] Due Date calendar picker works
-  - [ ] Time selector works
-  - [ ] Priority dropdown works
-  - [ ] Status dropdown works
-
-- [ ] Account Modal:
-  - [ ] Region/Country dropdowns work
-  - [ ] Status dropdown works
-  - [ ] Industry dropdown works
-
-- [ ] Contact Modal:
-  - [ ] Account selector dropdown works
-  - [ ] Contact Source dropdown works
-
-- [ ] Lead Modal:
-  - [ ] Account selector dropdown works
-  - [ ] Status/Source dropdowns work
-
-- [ ] Meeting Modal:
-  - [ ] Date/Time pickers work
-  - [ ] Timezone selector works
-  - [ ] Contact/Lead selectors work
-
-- [ ] Deal Form:
-  - [ ] All stage-related dropdowns work
-  - [ ] Date pickers work
-
-## Critical Files for Implementation
-
-- `src/components/ui/select.tsx` - Core Select component z-index fix
-- `src/components/ui/popover.tsx` - Core Popover component z-index fix  
-- `src/components/ui/tooltip.tsx` - Tooltip z-index verification
-- `src/components/tasks/TaskModal.tsx` - Primary affected component to test
-- `src/components/ui/dialog.tsx` - Reference for understanding the z-index structure

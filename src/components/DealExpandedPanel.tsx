@@ -630,7 +630,14 @@ const StakeholdersSection = ({ deal, queryClient }: {deal: Deal;queryClient: Ret
                           onChange={(e) => setNoteText(e.target.value)}
                           onKeyDown={handleNoteKeyDown}
                           className="min-h-[100px] text-xs resize-none"
-                          autoFocus
+                          ref={(el) => {
+                            if (el) {
+                              el.focus();
+                              const len = el.value.length;
+                              el.selectionStart = len;
+                              el.selectionEnd = len;
+                            }
+                          }}
                         />
                         <div className="flex justify-end gap-1.5">
                           <Button size="sm" variant="outline" className="h-7 text-xs px-3" onClick={() => { setEditingNote(null); setFocusedNoteId(null); }}>
@@ -1181,7 +1188,9 @@ export const DealExpandedPanel = ({
         {/* Content */}
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden gap-1">
           {/* Stakeholders Section */}
-          <StakeholdersSection deal={deal} queryClient={queryClient} />
+          <div className="shrink-0 max-h-[40%] overflow-y-auto">
+            <StakeholdersSection deal={deal} queryClient={queryClient} />
+          </div>
 
           {/* History Section */}
           <div className="flex flex-col flex-1 min-h-0 relative">

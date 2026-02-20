@@ -557,14 +557,15 @@ const StakeholdersSection = ({ deal, queryClient }: {deal: Deal;queryClient: Ret
                           <X className="h-3.5 w-3.5" />
                         </button>
 
-                        {/* Inline add button after last contact */}
+                        {/* Inline add button after last contact - show on hover */}
                         {shIdx === roleStakeholders.length - 1 &&
-                      <StakeholderAddDropdown
-                        contacts={allContacts}
-                        excludeIds={excludeIds}
-                        onAdd={(contact) => handleAddContact(role, contact)}
-                        cellRef={cellRef} />
-
+                      <div className="opacity-0 group-hover/row:opacity-60 hover:!opacity-100 transition-opacity">
+                        <StakeholderAddDropdown
+                          contacts={allContacts}
+                          excludeIds={excludeIds}
+                          onAdd={(contact) => handleAddContact(role, contact)}
+                          cellRef={cellRef} />
+                      </div>
                       }
                       </div>
                     )

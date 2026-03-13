@@ -3,6 +3,7 @@ import { useCampaignCommunications, useCampaignContacts, useCampaignAccounts, us
 import { useUserDisplayNames } from '@/hooks/useUserDisplayNames';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

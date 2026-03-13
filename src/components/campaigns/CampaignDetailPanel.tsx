@@ -13,6 +13,8 @@ import { CampaignAnalytics } from './CampaignAnalytics';
 import { CampaignActionItemsTab } from './CampaignActionItemsTab';
 import type { Campaign } from '@/types/campaign';
 import { format } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
   campaign: Campaign;

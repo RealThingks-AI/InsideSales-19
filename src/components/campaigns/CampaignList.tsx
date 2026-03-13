@@ -145,6 +145,9 @@ export function CampaignList({ campaigns, loading, onSelect, onEdit, onDelete, s
                       <DropdownMenuItem onClick={e => { e.stopPropagation(); onEdit(c); }}>
                         <Pencil className="h-4 w-4 mr-2" /> Edit
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={e => { e.stopPropagation(); cloneCampaign.mutate(c); }} disabled={cloneCampaign.isPending}>
+                        <Copy className="h-4 w-4 mr-2" /> Duplicate
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={e => { e.stopPropagation(); setDeleteId(c.id); }} className="text-destructive">
                         <Trash2 className="h-4 w-4 mr-2" /> Delete
                       </DropdownMenuItem>

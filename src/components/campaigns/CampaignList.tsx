@@ -32,6 +32,7 @@ const statusColors: Record<string, string> = {
 export function CampaignList({ campaigns, loading, onSelect, onEdit, onDelete, selectedId }: CampaignListProps) {
   const aggregatesQuery = useCampaignAggregates();
   const aggregates = aggregatesQuery.data || {};
+  const { cloneCampaign } = useCampaigns();
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Fetch owner names

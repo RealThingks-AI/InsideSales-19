@@ -13,6 +13,8 @@ import { CampaignAnalytics } from './CampaignAnalytics';
 import { CampaignActionItemsTab } from './CampaignActionItemsTab';
 import type { Campaign } from '@/types/campaign';
 import { format } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
   campaign: Campaign;
@@ -23,6 +25,18 @@ interface Props {
 export function CampaignDetailPanel({ campaign, onClose, onEdit }: Props) {
   const [activeTab, setActiveTab] = useState('overview');
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
+
+  // Fetch owner display name
+  const ownerQuery = useQuery({
+    queryKey: ['profile', campaign.owner],
+    queryFn: async () => {
+      if (!campaign.owner) return null;
+      const { data } = await supabase.from('profiles').select('full_name').eq('id', campaign.owner).single();
+      return data?.full_name || null;
+    },
+    enabled: !!campaign.owner,
+  });
+  const ownerName = ownerQuery.data || '—';
 
   const handleUseTemplate = useCallback((templateId: string) => {
     setPendingTemplateId(templateId);
@@ -72,6 +86,10 @@ export function CampaignDetailPanel({ campaign, onClose, onEdit }: Props) {
               <div>
                 <span className="text-muted-foreground">Type</span>
                 <p className="font-medium">{campaign.campaign_type || '—'}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Owner</span>
+                <p className="font-medium">{ownerName}</p>
               </div>
               <div>
                 <span className="text-muted-foreground">Target Audience</span>

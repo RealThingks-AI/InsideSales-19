@@ -4,9 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, Copy } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCampaignAggregates } from '@/hooks/useCampaigns';
+import { useCampaignAggregates, useCampaigns } from '@/hooks/useCampaigns';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Campaign } from '@/types/campaign';
@@ -32,6 +32,7 @@ const statusColors: Record<string, string> = {
 export function CampaignList({ campaigns, loading, onSelect, onEdit, onDelete, selectedId }: CampaignListProps) {
   const aggregatesQuery = useCampaignAggregates();
   const aggregates = aggregatesQuery.data || {};
+  const { cloneCampaign } = useCampaigns();
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Fetch owner names
@@ -143,6 +144,9 @@ export function CampaignList({ campaigns, loading, onSelect, onEdit, onDelete, s
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={e => { e.stopPropagation(); onEdit(c); }}>
                         <Pencil className="h-4 w-4 mr-2" /> Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={e => { e.stopPropagation(); cloneCampaign.mutate(c); }} disabled={cloneCampaign.isPending}>
+                        <Copy className="h-4 w-4 mr-2" /> Duplicate
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={e => { e.stopPropagation(); setDeleteId(c.id); }} className="text-destructive">
                         <Trash2 className="h-4 w-4 mr-2" /> Delete

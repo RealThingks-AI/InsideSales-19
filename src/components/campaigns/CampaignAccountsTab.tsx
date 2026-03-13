@@ -11,6 +11,7 @@ import { Plus, X, Search } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CAMPAIGN_ACCOUNT_STATUSES } from '@/types/campaign';
 import { StandardPagination } from '@/components/shared/StandardPagination';
+import { useToast } from '@/hooks/use-toast';
 
 interface Props {
   campaignId: string;
@@ -20,6 +21,7 @@ const PAGE_SIZE = 25;
 
 export function CampaignAccountsTab({ campaignId }: Props) {
   const { query, addAccount, removeAccount, updateAccountStatus } = useCampaignAccounts(campaignId);
+  const { toast } = useToast();
   const [addOpen, setAddOpen] = useState(false);
   const [accountSearch, setAccountSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -62,8 +64,16 @@ export function CampaignAccountsTab({ campaignId }: Props) {
   };
 
   const handleBulkAdd = async () => {
-    for (const accountId of Array.from(selectedIds)) {
-      await addAccount.mutateAsync({ accountId });
+    const ids = Array.from(selectedIds);
+    const results = await Promise.allSettled(
+      ids.map(accountId => addAccount.mutateAsync({ accountId }))
+    );
+    const failed = results.filter(r => r.status === 'rejected').length;
+    const succeeded = results.length - failed;
+    if (failed > 0) {
+      toast({ title: `Added ${succeeded} accounts`, description: `${failed} failed`, variant: 'destructive' });
+    } else {
+      toast({ title: `Added ${succeeded} account${succeeded !== 1 ? 's' : ''}` });
     }
     setSelectedIds(new Set());
     setAddOpen(false);

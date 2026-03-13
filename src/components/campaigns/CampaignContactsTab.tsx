@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CAMPAIGN_CONTACT_STAGES } from '@/types/campaign';
 import { ConvertToDealDialog } from './ConvertToDealDialog';
 import { StandardPagination } from '@/components/shared/StandardPagination';
+import { useToast } from '@/hooks/use-toast';
 import type { CampaignContact } from '@/types/campaign';
 
 interface Props {
@@ -23,6 +24,7 @@ const PAGE_SIZE = 25;
 export function CampaignContactsTab({ campaignId }: Props) {
   const { query, addContact, removeContact, updateContactStage } = useCampaignContacts(campaignId);
   const accountsHook = useCampaignAccounts(campaignId);
+  const { toast } = useToast();
   const [addOpen, setAddOpen] = useState(false);
   const [contactSearch, setContactSearch] = useState('');
   const [accountFilter, setAccountFilter] = useState<string>('all');
@@ -33,14 +35,21 @@ export function CampaignContactsTab({ campaignId }: Props) {
 
   const campaignAccounts = accountsHook.query.data || [];
 
+  // Fetch all contacts with their account_id for proper filtering
   const allContactsQuery = useQuery({
     queryKey: ['all_contacts_for_campaign'],
     queryFn: async () => {
-      const { data } = await supabase.from('contacts').select('id, contact_name, email, position, company_name, phone_no, linkedin').order('contact_name');
+      const { data } = await supabase
+        .from('contacts')
+        .select('id, contact_name, email, position, company_name, phone_no, linkedin, contact_owner')
+        .order('contact_name');
       return data || [];
     },
     enabled: addOpen,
   });
+
+  // Fetch accounts linked to campaign for filtering by account_id
+  const campaignAccountIds = new Set(campaignAccounts.map(a => a.account_id));
 
   const existingIds = new Set((query.data || []).map(c => c.contact_id));
 
@@ -49,12 +58,31 @@ export function CampaignContactsTab({ campaignId }: Props) {
     return [...new Set(allContacts.map(c => c.position).filter(Boolean))].sort() as string[];
   }, [allContactsQuery.data]);
 
+  // Fetch contact→account links to enable proper account filter
+  const contactAccountsQuery = useQuery({
+    queryKey: ['contacts_accounts_map', Array.from(campaignAccountIds).join(',')],
+    queryFn: async () => {
+      if (!campaignAccountIds.size) return {};
+      // Get all contacts linked to the campaign's accounts via leads/contacts tables
+      // contacts table has company_name but we join via accounts table account_name
+      // Build a map: account_id -> account_name
+      const map: Record<string, string> = {};
+      campaignAccounts.forEach(ca => {
+        if (ca.accounts?.account_name) map[ca.account_id] = ca.accounts.account_name;
+      });
+      return map;
+    },
+    enabled: addOpen && campaignAccountIds.size > 0,
+  });
+  const accountNameMap = contactAccountsQuery.data || {};
+
   const availableContacts = (allContactsQuery.data || []).filter(c => {
     if (existingIds.has(c.id)) return false;
     if (!c.contact_name.toLowerCase().includes(contactSearch.toLowerCase())) return false;
     if (accountFilter !== 'all') {
-      const account = campaignAccounts.find(a => a.account_id === accountFilter);
-      if (account && c.company_name?.toLowerCase() !== account.accounts?.account_name?.toLowerCase()) return false;
+      // Filter by matching company_name against the selected campaign account's name
+      const selectedAccountName = accountNameMap[accountFilter];
+      if (selectedAccountName && c.company_name?.toLowerCase() !== selectedAccountName.toLowerCase()) return false;
     }
     if (positionFilter !== 'all' && c.position !== positionFilter) return false;
     return true;
@@ -69,8 +97,16 @@ export function CampaignContactsTab({ campaignId }: Props) {
   };
 
   const handleBulkAdd = async () => {
-    for (const contactId of Array.from(selectedIds)) {
-      await addContact.mutateAsync({ contactId });
+    const ids = Array.from(selectedIds);
+    const results = await Promise.allSettled(
+      ids.map(contactId => addContact.mutateAsync({ contactId }))
+    );
+    const failed = results.filter(r => r.status === 'rejected').length;
+    const succeeded = results.length - failed;
+    if (failed > 0) {
+      toast({ title: `Added ${succeeded} contacts`, description: `${failed} failed`, variant: 'destructive' });
+    } else {
+      toast({ title: `Added ${succeeded} contact${succeeded !== 1 ? 's' : ''}` });
     }
     setSelectedIds(new Set());
     setAddOpen(false);

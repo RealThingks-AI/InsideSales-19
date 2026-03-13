@@ -40,6 +40,18 @@ export function CampaignOutreachTab({ campaignId, initialTemplateId, onTemplateP
   const [logOpen, setLogOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const [sending, setSending] = useState(false);
+
+  // Fetch sender's display name for {{sender_name}} placeholder
+  const senderNameQuery = useQuery({
+    queryKey: ['profile_sender', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return '';
+      const { data } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
+      return data?.full_name || user.email || '';
+    },
+    enabled: !!user?.id,
+  });
+  const senderName = senderNameQuery.data || '';
   const [form, setForm] = useState({
     communication_type: 'Email',
     contact_id: '',

@@ -145,12 +145,14 @@ export function CampaignOutreachTab({ campaignId, initialTemplateId, onTemplateP
       .replace(/\{\{contact_name\}\}/gi, contact?.contacts?.contact_name || '')
       .replace(/\{\{company_name\}\}/gi, contact?.contacts?.company_name || '')
       .replace(/\{\{email\}\}/gi, contact?.contacts?.email || '')
-      .replace(/\{\{position\}\}/gi, contact?.contacts?.position || '');
+      .replace(/\{\{position\}\}/gi, contact?.contacts?.position || '')
+      .replace(/\{\{sender_name\}\}/gi, senderName);
     const processedBody = sendForm.body
       .replace(/\{\{contact_name\}\}/gi, contact?.contacts?.contact_name || '')
       .replace(/\{\{company_name\}\}/gi, contact?.contacts?.company_name || '')
       .replace(/\{\{email\}\}/gi, contact?.contacts?.email || '')
-      .replace(/\{\{position\}\}/gi, contact?.contacts?.position || '');
+      .replace(/\{\{position\}\}/gi, contact?.contacts?.position || '')
+      .replace(/\{\{sender_name\}\}/gi, senderName);
 
     setSending(true);
     try {

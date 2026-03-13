@@ -61,8 +61,33 @@ export function ConvertToDealDialog({ open, onOpenChange, campaignId, campaignCo
     if (!user || !campaignContact) return;
     setLoading(true);
     try {
+      // Duplicate deal guard: check if a deal already exists for this campaign + contact combo
+      const { data: existingStakeholders } = await supabase
+        .from('deal_stakeholders')
+        .select('deal_id')
+        .eq('contact_id', campaignContact.contact_id);
+
+      if (existingStakeholders && existingStakeholders.length > 0) {
+        const dealIds = existingStakeholders.map(s => s.deal_id);
+        const { data: existingDeals } = await supabase
+          .from('deals')
+          .select('id, deal_name')
+          .eq('campaign_id', campaignId)
+          .in('id', dealIds);
+
+        if (existingDeals && existingDeals.length > 0) {
+          toast({
+            title: 'Deal already exists',
+            description: `A deal from this campaign for ${contactName} already exists: "${existingDeals[0].deal_name}"`,
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
       const name = dealName.trim() || `Campaign Lead - ${contactName}`;
-      
+
       // Create deal with account and owner
       const { data: dealData, error } = await supabase.from('deals').insert({
         deal_name: name,

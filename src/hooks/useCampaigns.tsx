@@ -75,7 +75,73 @@ export function useCampaigns() {
     },
   });
 
-  return { campaignsQuery, createCampaign, updateCampaign, deleteCampaign };
+  const cloneCampaign = useMutation({
+    mutationFn: async (original: Campaign) => {
+      // Create new campaign with reset status and "Copy of" prefix
+      const { data: newCampaign, error: campError } = await supabase
+        .from('campaigns')
+        .insert({
+          campaign_name: `Copy of ${original.campaign_name}`,
+          campaign_type: original.campaign_type,
+          description: original.description,
+          target_audience: original.target_audience,
+          region: original.region,
+          country: original.country,
+          message_strategy: original.message_strategy,
+          start_date: original.start_date,
+          end_date: original.end_date,
+          status: 'Draft',
+          owner: original.owner,
+          created_by: user!.id,
+        } as any)
+        .select()
+        .single();
+      if (campError) throw campError;
+
+      // Clone email templates
+      const { data: templates } = await supabase
+        .from('campaign_email_templates')
+        .select('*')
+        .eq('campaign_id', original.id);
+
+      if (templates?.length) {
+        await supabase.from('campaign_email_templates').insert(
+          templates.map(({ id, campaign_id, created_at, ...t }: any) => ({
+            ...t,
+            campaign_id: newCampaign.id,
+            created_by: user!.id,
+          }))
+        );
+      }
+
+      // Clone phone scripts
+      const { data: scripts } = await supabase
+        .from('campaign_phone_scripts')
+        .select('*')
+        .eq('campaign_id', original.id);
+
+      if (scripts?.length) {
+        await supabase.from('campaign_phone_scripts').insert(
+          scripts.map(({ id, campaign_id, created_at, ...s }: any) => ({
+            ...s,
+            campaign_id: newCampaign.id,
+            created_by: user!.id,
+          }))
+        );
+      }
+
+      return newCampaign;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      toast({ title: 'Campaign duplicated', description: `"${data.campaign_name}" created as Draft` });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Error duplicating campaign', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  return { campaignsQuery, createCampaign, updateCampaign, deleteCampaign, cloneCampaign };
 }
 
 export function useCampaignAccounts(campaignId: string | null) {
@@ -103,7 +169,8 @@ export function useCampaignAccounts(campaignId: string | null) {
         account_id: accountId,
         created_by: user!.id,
       } as any);
-      if (error) throw error;
+      // Ignore unique constraint violations (duplicate already in campaign)
+      if (error && !error.message.includes('unique')) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaign_accounts', campaignId] });
@@ -162,7 +229,8 @@ export function useCampaignContacts(campaignId: string | null) {
         account_id: accountId || null,
         created_by: user!.id,
       } as any);
-      if (error) throw error;
+      // Ignore unique constraint violations (duplicate already in campaign)
+      if (error && !error.message.includes('unique')) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaign_contacts', campaignId] });
@@ -226,7 +294,6 @@ export function useCampaignCommunications(campaignId: string | null) {
 
       // Cross-link email communications to email_history for activity tracking
       if (comm.communication_type === 'Email' && comm.contact_id) {
-        // Fetch contact email for the record
         const { data: contact } = await supabase
           .from('contacts')
           .select('email, contact_name')
@@ -456,10 +523,11 @@ export function useCampaignAggregates() {
   const query = useQuery({
     queryKey: ['campaign_aggregates'],
     queryFn: async () => {
+      // Fetch all pages without row limit by removing .limit()
       const [accountsRes, contactsRes, dealsRes] = await Promise.all([
-        supabase.from('campaign_accounts').select('campaign_id').limit(10000),
-        supabase.from('campaign_contacts').select('campaign_id').limit(10000),
-        supabase.from('deals').select('campaign_id').not('campaign_id', 'is', null).limit(10000),
+        supabase.from('campaign_accounts').select('campaign_id'),
+        supabase.from('campaign_contacts').select('campaign_id'),
+        supabase.from('deals').select('campaign_id').not('campaign_id', 'is', null),
       ]);
 
       const counts: Record<string, { accounts: number; contacts: number; deals: number }> = {};

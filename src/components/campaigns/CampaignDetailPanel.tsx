@@ -88,6 +88,10 @@ export function CampaignDetailPanel({ campaign, onClose, onEdit }: Props) {
                 <p className="font-medium">{campaign.campaign_type || '—'}</p>
               </div>
               <div>
+                <span className="text-muted-foreground">Owner</span>
+                <p className="font-medium">{ownerName}</p>
+              </div>
+              <div>
                 <span className="text-muted-foreground">Target Audience</span>
                 <p className="font-medium">{campaign.target_audience || '—'}</p>
               </div>

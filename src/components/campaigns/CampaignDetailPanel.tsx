@@ -26,6 +26,18 @@ export function CampaignDetailPanel({ campaign, onClose, onEdit }: Props) {
   const [activeTab, setActiveTab] = useState('overview');
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
 
+  // Fetch owner display name
+  const ownerQuery = useQuery({
+    queryKey: ['profile', campaign.owner],
+    queryFn: async () => {
+      if (!campaign.owner) return null;
+      const { data } = await supabase.from('profiles').select('full_name').eq('id', campaign.owner).single();
+      return data?.full_name || null;
+    },
+    enabled: !!campaign.owner,
+  });
+  const ownerName = ownerQuery.data || '—';
+
   const handleUseTemplate = useCallback((templateId: string) => {
     setPendingTemplateId(templateId);
     setActiveTab('outreach');

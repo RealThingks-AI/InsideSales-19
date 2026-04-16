@@ -52,7 +52,6 @@ export const DealsAdvancedFilter = ({
   availableRegions,
   availableLeadOwners,
   availablePriorities,
-  availableProbabilities,
   availableHandoffStatuses
 }: DealsAdvancedFilterProps) => {
   const [localFilters, setLocalFilters] = useState<AdvancedFilterState>(filters);
@@ -80,7 +79,7 @@ export const DealsAdvancedFilter = ({
     }));
   };
 
-  const toggleMultiSelectValue = (key: keyof Pick<AdvancedFilterState, 'stages' | 'regions' | 'leadOwners' | 'priorities' | 'probabilities' | 'handoffStatuses'>, value: string) => {
+  const toggleMultiSelectValue = (key: keyof Pick<AdvancedFilterState, 'stages' | 'regions' | 'leadOwners' | 'priorities' | 'handoffStatuses'>, value: string) => {
     const currentValues = localFilters[key] as string[];
     const newValues = currentValues.includes(value) ? currentValues.filter(v => v !== value) : [...currentValues, value];
     updateLocalFilter(key, newValues);
@@ -105,7 +104,6 @@ export const DealsAdvancedFilter = ({
     if (filters.regions.length > 0) count++;
     if (filters.leadOwners.length > 0) count++;
     if (filters.priorities.length > 0) count++;
-    if (filters.probabilities.length > 0) count++;
     if (filters.handoffStatuses.length > 0) count++;
     if (filters.searchTerm) count++;
     if (filters.probabilityRange[0] > 0 || filters.probabilityRange[1] < 100) count++;
@@ -134,7 +132,7 @@ export const DealsAdvancedFilter = ({
 
   const activeFiltersCount = getActiveFiltersCount();
 
-  const renderMultiSelectSection = (title: string, key: keyof Pick<AdvancedFilterState, 'stages' | 'regions' | 'leadOwners' | 'priorities' | 'probabilities' | 'handoffStatuses'>, options: string[]) => (
+  const renderMultiSelectSection = (title: string, key: keyof Pick<AdvancedFilterState, 'stages' | 'regions' | 'leadOwners' | 'priorities' | 'handoffStatuses'>, options: string[]) => (
     <div className="space-y-2">
       <Label className="text-sm font-medium">{title}</Label>
       <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
@@ -281,7 +279,6 @@ export const DealsAdvancedFilter = ({
                 {/* Right Column */}
                 <div className="space-y-4">
                   {renderMultiSelectSection("Lead Owners", "leadOwners", availableLeadOwners)}
-                  {renderMultiSelectSection("Probabilities (%)", "probabilities", PROBABILITY_OPTIONS)}
                   {renderMultiSelectSection("Handoff Status", "handoffStatuses", availableHandoffStatuses)}
                 </div>
               </div>

@@ -19,7 +19,6 @@ export interface AdvancedFilterState {
   regions: string[];
   leadOwners: string[];
   priorities: string[];
-  probabilities: string[];
   handoffStatuses: string[];
   searchTerm: string;
   probabilityRange: [number, number];
@@ -31,7 +30,6 @@ interface DealsAdvancedFilterProps {
   availableRegions: string[];
   availableLeadOwners: string[];
   availablePriorities: string[];
-  availableProbabilities: string[];
   availableHandoffStatuses: string[];
 }
 
@@ -40,15 +38,13 @@ const initialFilters: AdvancedFilterState = {
   regions: [],
   leadOwners: [],
   priorities: [],
-  probabilities: [],
   handoffStatuses: [],
   searchTerm: "",
   probabilityRange: [0, 100]
 };
 
-const REGION_OPTIONS = ["EU", "US", "Asia", "Other"];
+const REGION_OPTIONS = ["Africa", "Asia", "Europe", "Middle East", "North America", "Oceania", "South America"];
 const PRIORITY_OPTIONS = ["1", "2", "3", "4", "5"];
-const PROBABILITY_OPTIONS = ["10", "20", "30", "40", "50", "60", "70", "80", "90", "100"];
 
 export const DealsAdvancedFilter = ({
   filters,
